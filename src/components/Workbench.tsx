@@ -26,29 +26,41 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
   const { result, translating, error, run, reset } = useTranslation();
 
   useEffect(() => {
-    if (typeof chrome === "undefined" || !chrome.runtime) return;
-    
-    const listener = (msg: any) => {
-      if (msg.action === "tmt_speech_result") {
-        setSourceText(prev => prev ? prev + " " + msg.transcript : msg.transcript);
-        setListening(false);
-      } else if (msg.action === "tmt_speech_error") {
-        if (msg.error === "not-allowed") {
-           setDictateError("Microphone blocked. Please allow mic access on the current website.");
-        } else if (msg.error === "network") {
-           setDictateError("Network Error: To use voice dictation, you MUST use official Google Chrome.");
-        } else {
-           setDictateError("Speech error: " + msg.error);
-        }
-        setListening(false);
-      } else if (msg.action === "tmt_speech_end") {
-        setListening(false);
-      }
+    if (typeof chrome === "undefined" || !chrome.storage) return;
+
+    // Pick up result that arrived while popup was closed
+    chrome.storage.session.get("tmt_speech_pending", (res) => {
+      processSpeechPayload(res.tmt_speech_pending);
+    });
+
+    // Listen for live updates (when popup stays open)
+    const listener = (changes: any, area: string) => {
+      if (area !== "session" || !changes.tmt_speech_pending) return;
+      processSpeechPayload(changes.tmt_speech_pending.newValue);
     };
-    
-    chrome.runtime.onMessage.addListener(listener);
-    return () => chrome.runtime.onMessage.removeListener(listener);
+    chrome.storage.onChanged.addListener(listener);
+    return () => chrome.storage.onChanged.removeListener(listener);
   }, []);
+
+  function processSpeechPayload(payload: any) {
+    if (!payload) return;
+    chrome.storage.session.remove("tmt_speech_pending");
+    if (payload.status === "result") {
+      setSourceText(prev => prev ? prev + " " + payload.transcript : payload.transcript);
+      setListening(false);
+    } else if (payload.status === "error") {
+      if (payload.error === "not-allowed") {
+        setDictateError("Microphone blocked. Please allow mic access on the current website.");
+      } else if (payload.error === "network") {
+        setDictateError("Network Error: To use voice dictation, you MUST use official Google Chrome.");
+      } else {
+        setDictateError("Speech error: " + payload.error);
+      }
+      setListening(false);
+    } else if (payload.status === "end") {
+      setListening(false);
+    }
+  }
 
   const handleTranslate = async () => {
     if (!sourceText.trim() || sourceText.length > MAX_CHARS || translating) return;

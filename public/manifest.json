@@ -3,7 +3,7 @@
   "name": "reImagine Translator",
   "version": "1.0.0",
   "description": "Real-time translation for reImagine Engine",
-  "permissions": ["activeTab", "storage", "contextMenus", "scripting"],
+  "permissions": ["activeTab", "tabs", "storage", "contextMenus", "scripting"],
   "host_permissions": ["<all_urls>"],
   "action": {
     "default_popup": "index.html",
