@@ -29,13 +29,16 @@ chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
 
   if (msg.action === "tmt_speech_result") {
     chrome.storage.session.set({ tmt_speech_pending: { status: "result", transcript: msg.transcript } });
+    chrome.storage.session.remove("tmt_speech_active");
     return;
   }
   if (msg.action === "tmt_speech_error") {
     chrome.storage.session.set({ tmt_speech_pending: { status: "error", error: msg.error } });
+    chrome.storage.session.remove("tmt_speech_active");
     return;
   }
   if (msg.action === "tmt_speech_end") {
+    chrome.storage.session.remove("tmt_speech_active");
     chrome.storage.session.get("tmt_speech_pending", (res) => {
       if (!res.tmt_speech_pending) {
         chrome.storage.session.set({ tmt_speech_pending: { status: "end" } });

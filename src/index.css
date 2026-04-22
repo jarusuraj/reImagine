@@ -47,16 +47,27 @@ header, main, footer, aside, div, button, input, textarea, p, span, h1, h2, h3 {
               box-shadow 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+::-webkit-scrollbar-thumb { 
+  background: #cbd5e1; 
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; background-clip: content-box; }
 
-html.dark ::-webkit-scrollbar-thumb { background: #27272a; }
-html.dark ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+html.dark ::-webkit-scrollbar-thumb { background: #333; background-clip: content-box; }
+html.dark ::-webkit-scrollbar-thumb:hover { background: #444; background-clip: content-box; }
 
-textarea::-webkit-scrollbar { display: none; }
-textarea { -ms-overflow-style: none; scrollbar-width: none; }
+/* Removed hiding scrollbars to ensure accessibility */
+textarea {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+html.dark textarea {
+  scrollbar-color: #333 transparent;
+}
 
 .font-mono { font-family: 'JetBrains Mono', monospace; }
 

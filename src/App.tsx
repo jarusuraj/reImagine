@@ -4,7 +4,7 @@ import { Globe, RotateCcw, ArrowRight, Sparkles } from "lucide-react";
 import { Header }         from "@/components/Header";
 import { Workbench }      from "@/components/Workbench";
 import { HistorySidebar } from "@/components/HistorySidebar";
-import { FeatureStrip }   from "@/components/FeatureStrip";
+import { Footer }         from "@/components/Footer";
 import { useHistory }     from "@/hooks/useHistory";
 import type { Language }  from "@/types";
 
@@ -95,10 +95,10 @@ export default function App() {
         variants={stagger}
         initial="hidden"
         animate="show"
-        className="px-3 py-3 space-y-3 flex-1 flex flex-col relative z-10"
+        className="px-3 py-3 space-y-3 flex-1 flex flex-col relative z-10 min-h-0"
       >
         {/* Hero: Live Page Translate */}
-        <motion.div variants={fadeUp} className="relative group">
+        <motion.div variants={fadeUp} className="relative group shrink-0">
           <AnimatePresence mode="wait">
             {!pageTranslated ? (
               <motion.button
@@ -110,28 +110,27 @@ export default function App() {
                 disabled={!enabled}
                 whileHover={enabled ? { scale: 1.01 } : {}}
                 whileTap={enabled ? { scale: 0.98 } : {}}
-                className={`w-full flex items-center justify-between p-3 bg-white dark:bg-[#0a0a0a] border border-zinc-200/80 dark:border-white/[0.08] rounded-xl shadow-sm transition-all overflow-hidden relative ${
+                className={`w-full flex items-center justify-between p-2.5 bg-white dark:bg-[#0a0a0a] border border-zinc-200/80 dark:border-white/[0.08] rounded-xl shadow-sm transition-all overflow-hidden relative ${
                   !enabled ? "opacity-50 cursor-not-allowed grayscale" : "hover:shadow-md hover:border-zinc-300 dark:hover:border-white/[0.15]"
                 }`}
               >
-                {/* Subtle animated gradient background for premium feel */}
                 <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/50 via-transparent to-purple-50/50 dark:from-indigo-500/[0.03] dark:to-purple-500/[0.03] opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                 
-                <div className="flex items-center gap-3 relative z-10">
-                  <div className="w-9 h-9 rounded-lg bg-zinc-100 dark:bg-white/[0.05] border border-zinc-200/50 dark:border-white/[0.05] flex items-center justify-center text-zinc-900 dark:text-white group-hover:scale-105 group-hover:rotate-3 transition-transform duration-300 shadow-sm">
+                <div className="flex items-center gap-2.5 relative z-10">
+                  <div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-white/[0.05] border border-zinc-200/50 dark:border-white/[0.05] flex items-center justify-center text-zinc-900 dark:text-white group-hover:scale-105 transition-transform duration-300 shadow-sm">
                     <Sparkles className="w-4 h-4" />
                   </div>
                   <div className="text-left">
-                    <span className="block text-[14px] font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
-                      Live Page Translate
+                    <span className="block text-[13px] font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
+                      Translate Page
                       <span className="flex items-center text-[10px] bg-zinc-100 dark:bg-white/[0.08] px-1.5 py-0.5 rounded-md text-zinc-600 dark:text-zinc-400 font-bold tracking-wide">
                         {sourceLang.slice(0, 2).toUpperCase()}
-                        <ArrowRight className="w-2.5 h-2.5 mx-1" />
+                        <ArrowRight className="w-2.5 h-2.5 mx-0.5" />
                         {targetLang.slice(0, 2).toUpperCase()}
                       </span>
                     </span>
-                    <span className="block text-[12px] text-zinc-600 dark:text-zinc-400 mt-0.5 font-medium">
-                      Translate this entire webpage instantly
+                    <span className="block text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5 font-medium">
+                      Translate this entire webpage
                     </span>
                   </div>
                 </div>
@@ -142,15 +141,15 @@ export default function App() {
                 initial={{ opacity: 0, scale: 0.98, filter: "blur(4px)" }}
                 animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
                 exit={{ opacity: 0 }}
-                className="w-full flex items-center justify-between p-3 bg-[#f0fdf4] dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-500/20 rounded-xl shadow-sm"
+                className="w-full flex items-center justify-between p-2.5 bg-[#f0fdf4] dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-500/20 rounded-xl shadow-sm"
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-500/20">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-500/20">
                     <Globe className="w-4 h-4" />
                   </div>
                   <div className="text-left">
-                    <span className="block text-[14px] font-semibold text-emerald-900 dark:text-emerald-400">Page Translated</span>
-                    <span className="block text-[12px] text-emerald-600 dark:text-emerald-500/70 font-medium">Viewing translated version</span>
+                    <span className="block text-[13px] font-semibold text-emerald-900 dark:text-emerald-400">Page Translated</span>
+                    <span className="block text-[11px] text-emerald-600 dark:text-emerald-500/70 font-medium">Viewing translated version</span>
                   </div>
                 </div>
                 <motion.button
@@ -158,7 +157,7 @@ export default function App() {
                   whileTap={{ scale: 0.96 }}
                   onClick={handlePageRestore}
                   aria-label="Restore original page"
-                  className="px-3.5 py-2 bg-white dark:bg-[#111] border border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-400 rounded-xl text-[12px] font-semibold flex items-center gap-2 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors shadow-sm"
+                  className="px-3 py-1.5 bg-white dark:bg-[#111] border border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-400 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors shadow-sm"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   Restore
@@ -168,7 +167,7 @@ export default function App() {
           </AnimatePresence>
         </motion.div>
 
-        <motion.div variants={fadeUp}>
+        <motion.div variants={fadeUp} className="flex-1 min-h-0 flex flex-col">
           <Workbench
             enabled={enabled}
             onResult={add}
@@ -179,15 +178,9 @@ export default function App() {
           />
         </motion.div>
 
-        <motion.div variants={fadeUp}>
-          <FeatureStrip />
+        <motion.div variants={fadeUp} className="shrink-0">
+          <Footer />
         </motion.div>
-
-        <motion.footer variants={fadeUp} className="mt-auto text-center pb-1 pt-2">
-          <p className="text-[11px] font-medium text-zinc-500 dark:text-zinc-600 tracking-wide">
-            &copy; 2026 reImagine. All rights reserved.
-          </p>
-        </motion.footer>
       </motion.main>
 
       <HistorySidebar

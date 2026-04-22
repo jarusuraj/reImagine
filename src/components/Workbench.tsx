@@ -28,15 +28,23 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
   useEffect(() => {
     if (typeof chrome === "undefined" || !chrome.storage) return;
 
-    // Pick up result that arrived while popup was closed
-    chrome.storage.session.get("tmt_speech_pending", (res) => {
+    // Check if speech recognition is in progress (popup was closed and reopened)
+    chrome.storage.session.get(["tmt_speech_pending", "tmt_speech_active"], (res) => {
+      if (res.tmt_speech_active) {
+        setListening(true);
+      }
       processSpeechPayload(res.tmt_speech_pending);
     });
 
-    // Listen for live updates (when popup stays open)
+    // Listen for live updates (when popup stays open or reopens)
     const listener = (changes: any, area: string) => {
-      if (area !== "session" || !changes.tmt_speech_pending) return;
-      processSpeechPayload(changes.tmt_speech_pending.newValue);
+      if (area !== "session") return;
+      if (changes.tmt_speech_pending) {
+        processSpeechPayload(changes.tmt_speech_pending.newValue);
+      }
+      if (changes.tmt_speech_active && !changes.tmt_speech_active.newValue) {
+        setListening(false);
+      }
     };
     chrome.storage.onChanged.addListener(listener);
     return () => chrome.storage.onChanged.removeListener(listener);
@@ -44,15 +52,19 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
 
   function processSpeechPayload(payload: any) {
     if (!payload) return;
-    chrome.storage.session.remove("tmt_speech_pending");
+    chrome.storage.session.remove(["tmt_speech_pending", "tmt_speech_active"]);
     if (payload.status === "result") {
       setSourceText(prev => prev ? prev + " " + payload.transcript : payload.transcript);
       setListening(false);
     } else if (payload.status === "error") {
       if (payload.error === "not-allowed") {
-        setDictateError("Microphone blocked. Please allow mic access on the current website.");
+        setDictateError("Microphone blocked. Allow mic access in your browser settings for this site.");
       } else if (payload.error === "network") {
-        setDictateError("Network Error: To use voice dictation, you MUST use official Google Chrome.");
+        setDictateError("Speech service unreachable. Check your internet connection and try again.");
+      } else if (payload.error === "no-speech") {
+        setDictateError("No speech detected. Please try again and speak clearly.");
+      } else if (payload.error === "aborted") {
+        // User or system aborted, no error message needed
       } else {
         setDictateError("Speech error: " + payload.error);
       }
@@ -65,11 +77,21 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
   const handleTranslate = async () => {
     if (!sourceText.trim() || sourceText.length > MAX_CHARS || translating) return;
     
-    // Auto-detect language purely based on character set
+    // Auto-detect language purely based on character set + heuristics
     let detectedSourceLang = sourceLang;
     if (sourceLang === "Auto") {
       const isDevanagari = /[\u0900-\u097F]/.test(sourceText);
-      detectedSourceLang = isDevanagari ? "Nepali" : "English";
+      if (isDevanagari) {
+        // Common Tamang markers (Devanagari)
+        const tamangMarkers = [
+          "मुबा", "ताबा", "लासो", "नबा", "ह्या", "खिम", "गिबा", "ब्रोबा", "क्यु", "सुङ्बा",
+          "च्यु", "मेवा", "खई", "ह्याम्बो", "निसा", "सेबा", "पापा", "आमा", "अाङा"
+        ];
+        const isTamang = tamangMarkers.some(marker => sourceText.includes(marker));
+        detectedSourceLang = isTamang ? "Tamang" : "Nepali";
+      } else {
+        detectedSourceLang = "English";
+      }
       onSourceLangChange(detectedSourceLang); // Update UI to detected language
     }
 
@@ -117,6 +139,10 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
     if (typeof chrome !== "undefined" && chrome.tabs) {
       setListening(true);
       setDictateError("");
+      
+      // Persist the listening state so it survives popup close/reopen
+      chrome.storage.session.set({ tmt_speech_active: true });
+      
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         const tab = tabs[0];
         const id = tab?.id;
@@ -125,6 +151,7 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
         if (url.startsWith("chrome://") || url.startsWith("edge://") || url.startsWith("about:") || !url.startsWith("http")) {
           setDictateError("Voice dictation only works on regular websites (HTTPS). Please try on a real webpage.");
           setListening(false);
+          chrome.storage.session.remove("tmt_speech_active");
           return;
         }
 
@@ -133,14 +160,21 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
             action: "tmt_start_speech", 
             lang: LANG_MAP[sourceLang] || "en-US" 
           }, (response) => {
-            if (chrome.runtime.lastError || !response || response.error) {
+            if (chrome.runtime.lastError) {
               setDictateError("Content script not ready. Please REFRESH the current page and try again.");
               setListening(false);
+              chrome.storage.session.remove("tmt_speech_active");
+            } else if (!response || response.error) {
+              const msg = response?.error || "Speech recognition unavailable in this browser.";
+              setDictateError(msg);
+              setListening(false);
+              chrome.storage.session.remove("tmt_speech_active");
             }
           });
         } else {
           setDictateError("No active tab found to process speech.");
           setListening(false);
+          chrome.storage.session.remove("tmt_speech_active");
         }
       });
       return;
@@ -182,9 +216,11 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
       recognition.onerror = (event: any) => {
         console.error("Speech Recognition Error:", event.error);
         if (event.error === "not-allowed") {
-          setDictateError("Microphone blocked. Please allow mic access.");
+          setDictateError("Microphone blocked. Allow mic access in your browser settings.");
         } else if (event.error === "network") {
-          setDictateError("Network Error: To use voice dictation, you MUST use official Google Chrome.");
+          setDictateError("Speech service unreachable. Check your internet connection and try again.");
+        } else if (event.error === "no-speech") {
+          setDictateError("No speech detected. Please try again and speak clearly.");
         } else {
           setDictateError(`Speech error: ${event.error}`);
         }
@@ -207,10 +243,10 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
 
   return (
     <div
-      className="flex flex-col border border-zinc-200/80 dark:border-white/[0.08] rounded-xl bg-white dark:bg-[#0a0a0a] overflow-hidden shadow-sm relative z-10"
+      className="flex flex-col flex-1 min-h-0 border border-zinc-200/80 dark:border-white/[0.08] rounded-xl bg-white dark:bg-[#0a0a0a] overflow-hidden shadow-sm relative z-10"
     >
       {/* Source section */}
-      <div className="p-3 pb-2.5 border-b border-zinc-100 dark:border-white/[0.06] bg-zinc-50/50 dark:bg-transparent">
+      <div className="p-3 pb-2 border-b border-zinc-100 dark:border-white/[0.06] bg-zinc-50/50 dark:bg-transparent shrink-0">
         <LangSelector
           value={sourceLang}
           onChange={(l) => { if (l === targetLang) onTargetLangChange(sourceLang); onSourceLangChange(l); }}
@@ -228,9 +264,9 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
             }
           }}
           placeholder="Type or paste text…"
-          rows={2}
+          rows={3}
           aria-label="Source text"
-          className="w-full mt-2.5 bg-transparent text-[14px] font-medium text-zinc-900 dark:text-zinc-100 placeholder-zinc-500 dark:placeholder-zinc-400 outline-none resize-none leading-relaxed"
+          className="w-full mt-2 bg-transparent text-[14px] font-medium text-zinc-900 dark:text-zinc-100 placeholder-zinc-500 dark:placeholder-zinc-400 outline-none resize-none leading-relaxed"
           style={{ maxHeight: "80px" }}
         />
         <div className="flex justify-between items-center mt-1 h-5">
@@ -271,7 +307,7 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
       </div>
 
       {/* Swap button */}
-      <div className="relative z-20 -my-4 flex justify-center items-center h-8 pointer-events-none">
+      <div className="relative z-20 -my-3.5 flex justify-center items-center h-7 pointer-events-none shrink-0">
         <motion.button
           onClick={handleSwap}
           whileHover={{ scale: 1.12, rotate: 180 }}
@@ -285,14 +321,14 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
       </div>
 
       {/* Target section */}
-      <div className="p-3 pt-2.5 bg-white dark:bg-[#0a0a0a]">
+      <div className="p-3 pt-2 bg-white dark:bg-[#0a0a0a] flex-1 min-h-0 flex flex-col">
         <LangSelector
           value={targetLang}
           onChange={(l) => { if (l === sourceLang) onSourceLangChange(targetLang); onTargetLangChange(l); }}
           idPrefix="target"
         />
 
-        <div className="min-h-[110px] mt-2.5 relative">
+        <div className="min-h-[64px] flex-1 mt-2 relative overflow-y-auto">
           <AnimatePresence mode="wait">
             {translating ? (
               <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col gap-2.5 pt-1">
@@ -325,7 +361,7 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
       </div>
 
       {/* Action bar */}
-      <div className="flex justify-between items-center px-3 py-2.5 border-t border-zinc-100 dark:border-white/[0.06] bg-zinc-50/50 dark:bg-transparent">
+      <div className="flex justify-between items-center px-3 py-2 border-t border-zinc-100 dark:border-white/[0.06] bg-zinc-50/50 dark:bg-transparent shrink-0">
         <div className="flex items-center gap-1.5">
           <motion.button
             whileHover={{ scale: 1.08 }}
@@ -350,7 +386,7 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
           disabled={!canTranslate}
           whileHover={canTranslate ? { scale: 1.02 } : {}}
           whileTap={canTranslate ? { scale: 0.98 } : {}}
-          className="bg-zinc-900 text-white dark:bg-white dark:text-black px-4 py-1.5 rounded-lg text-[13px] font-semibold hover:bg-black dark:hover:bg-zinc-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+          className="bg-[#1a73e8] text-white dark:bg-[#8ab4f8] dark:text-[#202124] px-5 py-1.5 rounded-lg text-[13px] font-semibold hover:bg-[#1765cc] dark:hover:bg-[#aecbfa] transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
         >
           {translating ? "Translating…" : "Translate"}
         </motion.button>

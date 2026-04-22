@@ -34,7 +34,7 @@ export function Header({ onHistory, historyOpen, enabled, toggleEnabled }: Props
   const isDark = theme === "dark" || (theme === "system" && typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches);
 
   return (
-    <header className="flex items-center justify-between px-4 py-3 border-b border-zinc-200/80 dark:border-white/[0.08] bg-white/80 dark:bg-[#0a0a0a]/80 backdrop-blur-md shrink-0 transition-colors z-20">
+    <header className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-200/80 dark:border-white/[0.08] bg-white/80 dark:bg-[#0a0a0a]/80 backdrop-blur-md shrink-0 transition-colors z-20">
       {/* Brand */}
       <div className="flex items-center gap-2.5">
         <div className={`shrink-0 transition-opacity ${!enabled ? "opacity-40" : ""}`}>
