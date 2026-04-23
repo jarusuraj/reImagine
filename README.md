@@ -38,6 +38,9 @@ The extension operates on a strictly isolated message-passing architecture to pr
 - Use the **Power Icon** in the header to enable or disable the extension globally. When off, the extension stops all background processing and DOM observation for maximum privacy.
 - Toggle between **Light and Dark mode** using the theme icon for a personalized experience.
 
+###5. Limitations
+-The speech to text does not work with brave browser due to internal scripting conflit but it works with all other browsers with ease.
+
 ## Setup Instructions
 1. Clone the repository.
 2. Duplicate `.env.example` to `.env` and insert your `TMT_API_URL` and `TMT_API_KEY`.
