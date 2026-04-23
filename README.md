@@ -37,22 +37,27 @@ Never lose a translation. Your recent work is saved in a sleek, searchable sideb
 *   When you visit a page in a different language, a smart prompt will appear at the top asking if you'd like to translate it.
 *   You can also click the **"Translate Page"** banner in the popup at any time.
 
-### 3. Settings & Privacy
-*   **Master Switch**: Use the power icon in the header to disable all background observers.
-*   **Privacy First**: Before translating a full page, reImagine will ask for your confirmation to ensure you aren't sending sensitive data (like bank info) to the cloud.
+### 3. Context Menu Translation
+- Highlight any text on a webpage.
+- Right-click and select **"Translate with TMT"**.
+- A sleek overlay will appear near your selection with the translation.
 
+### 4. Global Control
+- Use the **Power Icon** in the header to enable or disable the extension globally. When off, the extension stops all background processing and DOM observation for maximum privacy.
+- Toggle between **Light and Dark mode** using the theme icon for a personalized experience.
+
+## Setup Instructions
+1. Clone the repository.
+2. Duplicate `.env.example` to `.env` and insert your `TMT_API_URL` and `TMT_API_KEY`.
+3. Install dependencies: `npm install`
+4. Build the extension: `npm run build`
+5. Load the `dist/` directory as an unpacked extension in Chrome (`chrome://extensions`).
+
+## Security Audit
+- Removed `window.postMessage` listeners to prevent malicious page scripts from hijacking the translation API.
+- All DOM mutations use `textContent` or `nodeValue` strictly to prevent innerHTML injection vulnerabilities.
+- Dependencies locked and audited.
+ 
 ---
-
-## 🛠️ Developer Setup
-
-1.  **Clone**: `git clone https://github.com/jarusuraj/reImagine.git`
-2.  **Config**: Rename `.env.example` to `.env` and add your `TMT_API_URL` and `TMT_API_KEY`.
-3.  **Install**: `npm install`
-4.  **Build**: `npm run build`
-5.  **Load**: Open Chrome, go to `chrome://extensions`, enable **Developer Mode**, and click **Load Unpacked**. Select the `dist/` folder.
-
----
-
-**Team:** reImagine  
-**Track:** TMT Hackathon - Browser Plugin/Extension  
-**Vision:** Bringing Devanagari scripts and Himalayan languages to the forefront of the digital world.
+**Team:** reImagine
+**Track:** Browser Plugin/Extension
