@@ -18,7 +18,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   chrome.tabs.sendMessage(tab.id, {
     action: "tmt_context_translate",
     text:   info.selectionText,
-  });
+  }).catch(() => {});
 });
 
 chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
@@ -28,8 +28,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
   }
 
   if (msg.action === "tmt_speech_result") {
-    chrome.storage.session.set({ tmt_speech_pending: { status: "result", transcript: msg.transcript } });
-    chrome.storage.session.remove("tmt_speech_active");
+    chrome.storage.session.set({ tmt_speech_pending: { status: "result", finalTranscript: msg.finalTranscript, interimTranscript: msg.interimTranscript } });
     return;
   }
   if (msg.action === "tmt_speech_error") {

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Copy, Check, ArrowDownUp, X, Keyboard, Mic } from "lucide-react";
+import { Copy, Check, ArrowDownUp, X, Keyboard, Mic, Square, Volume2 } from "lucide-react";
 import { LangSelector } from "./LangSelector";
 import { useTranslation } from "@/hooks/useTranslation";
 import type { Language, TranslationResult } from "@/types";
@@ -20,8 +20,14 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
   const [sourceText, setSourceText] = useState("");
   const [copied, setCopied] = useState(false);
   const [listening, setListening] = useState(false);
+  const [interimText, setInterimText] = useState("");
   const [dictateError, setDictateError] = useState("");
+  const [isSpeakingSource, setIsSpeakingSource] = useState(false);
+  const [isSpeakingTarget, setIsSpeakingTarget] = useState(false);
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const localRecognitionRef = useRef<any>(null);
+  const existingTextRef = useRef("");
 
   const { result, translating, error, run, reset } = useTranslation();
 
@@ -36,31 +42,78 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
       processSpeechPayload(res.tmt_speech_pending);
     });
 
-    // Listen for live updates (when popup stays open or reopens)
-    const listener = (changes: any, area: string) => {
-      if (area !== "session") return;
-      if (changes.tmt_speech_pending) {
-        processSpeechPayload(changes.tmt_speech_pending.newValue);
+    // Listen for live updates (when popup stays open) via direct messaging to avoid storage throttling
+    const msgListener = (msg: any) => {
+      if (msg.action === "tmt_speech_result") {
+        processSpeechPayload({ status: "result", finalTranscript: msg.finalTranscript, interimTranscript: msg.interimTranscript });
+      } else if (msg.action === "tmt_speech_error") {
+        processSpeechPayload({ status: "error", error: msg.error });
+      } else if (msg.action === "tmt_speech_end") {
+        processSpeechPayload({ status: "end" });
       }
+    };
+    chrome.runtime.onMessage.addListener(msgListener);
+
+    // Also listen to storage for state persistence if popup was closed
+    const storageListener = (changes: any, area: string) => {
+      if (area !== "session") return;
       if (changes.tmt_speech_active && !changes.tmt_speech_active.newValue) {
         setListening(false);
       }
     };
-    chrome.storage.onChanged.addListener(listener);
-    return () => chrome.storage.onChanged.removeListener(listener);
+    chrome.storage.onChanged.addListener(storageListener);
+
+    return () => {
+      chrome.runtime.onMessage.removeListener(msgListener);
+      chrome.storage.onChanged.removeListener(storageListener);
+    };
+  }, []);
+
+  useEffect(() => {
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length > 0) {
+        setAvailableVoices(voices);
+      }
+    };
+    
+    loadVoices();
+    
+    // Voices are loaded asynchronously in many browsers
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+    
+    // Polling fallback for browsers where onvoiceschanged is unreliable
+    const interval = setInterval(() => {
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length > 0) {
+        setAvailableVoices(voices);
+        clearInterval(interval);
+      }
+    }, 500);
+
+    return () => {
+      clearInterval(interval);
+      if (window.speechSynthesis.onvoiceschanged) {
+        window.speechSynthesis.onvoiceschanged = null;
+      }
+    };
   }, []);
 
   function processSpeechPayload(payload: any) {
     if (!payload) return;
-    chrome.storage.session.remove(["tmt_speech_pending", "tmt_speech_active"]);
+    chrome.storage.session.remove(["tmt_speech_pending"]);
     if (payload.status === "result") {
-      setSourceText(prev => prev ? prev + " " + payload.transcript : payload.transcript);
-      setListening(false);
+      if (payload.finalTranscript) {
+        existingTextRef.current = existingTextRef.current ? existingTextRef.current + " " + payload.finalTranscript : payload.finalTranscript;
+        setSourceText(existingTextRef.current);
+      }
+      setInterimText(payload.interimTranscript || "");
+      // Removed setListening(false) so it keeps listening continuously
     } else if (payload.status === "error") {
       if (payload.error === "not-allowed") {
         setDictateError("Microphone blocked. Allow mic access in your browser settings for this site.");
       } else if (payload.error === "network") {
-        setDictateError("Speech service unreachable. Check your internet connection and try again.");
+        setDictateError("no Internet");
       } else if (payload.error === "no-speech") {
         setDictateError("No speech detected. Please try again and speak clearly.");
       } else if (payload.error === "aborted") {
@@ -69,8 +122,10 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
         setDictateError("Speech error: " + payload.error);
       }
       setListening(false);
+      chrome.storage.session.remove("tmt_speech_active");
     } else if (payload.status === "end") {
       setListening(false);
+      chrome.storage.session.remove("tmt_speech_active");
     }
   }
 
@@ -85,7 +140,8 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
         // Common Tamang markers (Devanagari)
         const tamangMarkers = [
           "मुबा", "ताबा", "लासो", "नबा", "ह्या", "खिम", "गिबा", "ब्रोबा", "क्यु", "सुङ्बा",
-          "च्यु", "मेवा", "खई", "ह्याम्बो", "निसा", "सेबा", "पापा", "आमा", "अाङा"
+          "च्यु", "मेवा", "खई", "ह्याम्बो", "निसा", "सेबा", "पापा", "आमा", "अाङा",
+          "ङा", "छ्यो", "ख्याप", "ङारो", "ग्याम", "सेम", "खे"
         ];
         const isTamang = tamangMarkers.some(marker => sourceText.includes(marker));
         detectedSourceLang = isTamang ? "Tamang" : "Nepali";
@@ -122,23 +178,124 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
 
   const handleClear = () => {
     setSourceText("");
+    existingTextRef.current = "";
     reset();
     textareaRef.current?.focus();
   };
 
-  const handleDictate = async () => {
-    if (listening) return;
+  const LANG_MAP: Record<string, string> = {
+    "Auto":    "en-US",
+    "English": "en-US",
+    "Nepali":  "ne-NP",
+    "Tamang":  "ne-NP"
+  };
 
-    const LANG_MAP: Record<string, string> = {
-      "Auto":    "en-US",
-      "English": "en-US",
-      "Nepali":  "ne-NP",
-      "Tamang":  "ne-NP"
+  const handleTTS = () => {
+    if (!result?.translation) return;
+    if (window.speechSynthesis.speaking && isSpeakingTarget) {
+      window.speechSynthesis.cancel();
+      setIsSpeakingTarget(false);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(result.translation);
+    const langCode = LANG_MAP[targetLang] || "ne-NP";
+    utterance.lang = langCode;
+    
+    // Maximized voice selection: Prioritize Neural, Natural, Enhanced, and Online voices
+    const preferredVoice = 
+      availableVoices.find(v => v.lang === langCode && !v.localService && (v.name.includes("Natural") || v.name.includes("Neural") || v.name.includes("Enhanced") || v.name.includes("Premium"))) ||
+      availableVoices.find(v => v.lang === langCode && (v.name.includes("Google") || v.name.includes("Online"))) ||
+      availableVoices.find(v => v.lang === langCode && !v.localService) ||
+      availableVoices.find(v => v.lang.startsWith(langCode.split("-")[0]) && (v.name.includes("Natural") || v.name.includes("Neural"))) ||
+      availableVoices.find(v => v.lang === langCode) || 
+      availableVoices.find(v => v.lang.startsWith(langCode.split("-")[0])) ||
+      // Fallback for Nepali
+      availableVoices.find(v => (v.lang.includes("ne") || v.name.toLowerCase().includes("nepali")) && targetLang === "Nepali") ||
+      availableVoices.find(v => v.lang.startsWith("hi") && targetLang === "Nepali");
+    
+    if (preferredVoice) utterance.voice = preferredVoice;
+    
+    utterance.rate = 0.9; 
+    utterance.pitch = 1.0; 
+    utterance.volume = 1.0;
+
+    utterance.onstart = () => setIsSpeakingTarget(true);
+    utterance.onend = () => setIsSpeakingTarget(false);
+    utterance.onerror = (e) => {
+      console.error("TTS Error:", e);
+      setIsSpeakingTarget(false);
     };
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const handleSourceTTS = () => {
+    if (!sourceText) return;
+    if (window.speechSynthesis.speaking && isSpeakingSource) {
+      window.speechSynthesis.cancel();
+      setIsSpeakingSource(false);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(sourceText);
+    const langCode = LANG_MAP[sourceLang] || "en-US";
+    utterance.lang = langCode;
+
+    const preferredVoice = 
+      availableVoices.find(v => v.lang === langCode && !v.localService && (v.name.includes("Natural") || v.name.includes("Neural") || v.name.includes("Enhanced") || v.name.includes("Premium"))) ||
+      availableVoices.find(v => v.lang === langCode && (v.name.includes("Google") || v.name.includes("Online"))) ||
+      availableVoices.find(v => v.lang === langCode && !v.localService) ||
+      availableVoices.find(v => v.lang.startsWith(langCode.split("-")[0]) && (v.name.includes("Natural") || v.name.includes("Neural"))) ||
+      availableVoices.find(v => v.lang === langCode) || 
+      availableVoices.find(v => v.lang.startsWith(langCode.split("-")[0])) ||
+      // Fallback for Nepali
+      availableVoices.find(v => (v.lang.includes("ne") || v.name.toLowerCase().includes("nepali")) && sourceLang === "Nepali") ||
+      availableVoices.find(v => v.lang.startsWith("hi") && sourceLang === "Nepali");
+    
+    if (preferredVoice) utterance.voice = preferredVoice;
+
+    utterance.rate = 0.9;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+
+    utterance.onstart = () => setIsSpeakingSource(true);
+    utterance.onend = () => setIsSpeakingSource(false);
+    utterance.onerror = (e) => {
+      console.error("Source TTS Error:", e);
+      setIsSpeakingSource(false);
+    };
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const handleDictate = async () => {
+    if (listening) {
+      if (typeof chrome !== "undefined" && chrome.tabs) {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          if (tabs[0]?.id) {
+            chrome.tabs.sendMessage(tabs[0].id, { action: "tmt_stop_speech" });
+          }
+        });
+      }
+      if (localRecognitionRef.current) {
+        try { localRecognitionRef.current.stop(); } catch (e) {}
+        localRecognitionRef.current = null;
+      }
+      setListening(false);
+      setInterimText("");
+      if (typeof chrome !== "undefined" && chrome.storage) {
+        chrome.storage.session.remove("tmt_speech_active");
+      }
+      return;
+    }
 
     if (typeof chrome !== "undefined" && chrome.tabs) {
       setListening(true);
       setDictateError("");
+      existingTextRef.current = sourceText;
       
       // Persist the listening state so it survives popup close/reopen
       chrome.storage.session.set({ tmt_speech_active: true });
@@ -156,21 +313,44 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
         }
 
         if (id) {
-          chrome.tabs.sendMessage(id, { 
-            action: "tmt_start_speech", 
-            lang: LANG_MAP[sourceLang] || "en-US" 
-          }, (response) => {
-            if (chrome.runtime.lastError) {
-              setDictateError("Content script not ready. Please REFRESH the current page and try again.");
-              setListening(false);
-              chrome.storage.session.remove("tmt_speech_active");
-            } else if (!response || response.error) {
-              const msg = response?.error || "Speech recognition unavailable in this browser.";
-              setDictateError(msg);
-              setListening(false);
-              chrome.storage.session.remove("tmt_speech_active");
-            }
-          });
+          const sendSpeechMsg = () => {
+            chrome.tabs.sendMessage(id, { 
+              action: "tmt_start_speech", 
+              lang: LANG_MAP[sourceLang] || "en-US" 
+            }, (response) => {
+              if (chrome.runtime.lastError) {
+                // Content script not loaded, inject it
+                chrome.scripting.executeScript({
+                  target: { tabId: id },
+                  files: ["content.js"]
+                }, () => {
+                  if (chrome.runtime.lastError) {
+                    setDictateError("Cannot start voice on this page. Please refresh the page manually.");
+                    setListening(false);
+                    chrome.storage.session.remove("tmt_speech_active");
+                    return;
+                  }
+                  // Retry sending after injection
+                  chrome.tabs.sendMessage(id, { 
+                    action: "tmt_start_speech", 
+                    lang: LANG_MAP[sourceLang] || "en-US" 
+                  }, (retryRes) => {
+                    if (chrome.runtime.lastError || (!retryRes || retryRes.error)) {
+                      setDictateError(chrome.runtime.lastError ? "Failed to start. Refresh page." : (retryRes?.error || "Error"));
+                      setListening(false);
+                      chrome.storage.session.remove("tmt_speech_active");
+                    }
+                  });
+                });
+              } else if (!response || response.error) {
+                const msg = response?.error || "comming soon";
+                setDictateError(msg);
+                setListening(false);
+                chrome.storage.session.remove("tmt_speech_active");
+              }
+            });
+          };
+          sendSpeechMsg();
         } else {
           setDictateError("No active tab found to process speech.");
           setListening(false);
@@ -190,27 +370,32 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
       }
       
       const recognition = new SpeechRecognition();
+      localRecognitionRef.current = recognition;
       recognition.lang = LANG_MAP[sourceLang] || "en-US";
-      recognition.interimResults = false;
-      recognition.continuous = false;
-
-      // Store the existing text when dictation starts
-      let existingText = "";
+      recognition.interimResults = true;
+      recognition.continuous = true;
 
       recognition.onstart = () => {
         setListening(true);
         setDictateError("");
-        setSourceText(prev => {
-          existingText = prev;
-          return prev;
-        });
+        existingTextRef.current = sourceText;
       };
 
       recognition.onresult = (event: any) => {
-        const transcript = Array.from(event.results)
-          .map((res: any) => res[0].transcript)
-          .join("");
-        setSourceText(existingText ? existingText + " " + transcript : transcript);
+        let finalT = "";
+        let interimT = "";
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalT += event.results[i][0].transcript;
+          } else {
+            interimT += event.results[i][0].transcript;
+          }
+        }
+        if (finalT) {
+          existingTextRef.current = existingTextRef.current ? existingTextRef.current + " " + finalT : finalT;
+          setSourceText(existingTextRef.current);
+        }
+        setInterimText(interimT);
       };
 
       recognition.onerror = (event: any) => {
@@ -218,7 +403,7 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
         if (event.error === "not-allowed") {
           setDictateError("Microphone blocked. Allow mic access in your browser settings.");
         } else if (event.error === "network") {
-          setDictateError("Speech service unreachable. Check your internet connection and try again.");
+          setDictateError("comming soon");
         } else if (event.error === "no-speech") {
           setDictateError("No speech detected. Please try again and speak clearly.");
         } else {
@@ -227,7 +412,11 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
         setListening(false);
       };
       
-      recognition.onend = () => setListening(false);
+      recognition.onend = () => {
+        setListening(false);
+        setInterimText("");
+        localRecognitionRef.current = null;
+      };
 
       recognition.start();
     } catch (err: any) {
@@ -255,8 +444,11 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
         <textarea
           ref={textareaRef}
           disabled={!enabled}
-          value={sourceText}
-          onChange={(e) => setSourceText(e.target.value)}
+          value={listening && interimText ? (sourceText ? sourceText + " " + interimText : interimText) : sourceText}
+          onChange={(e) => {
+            setSourceText(e.target.value);
+            existingTextRef.current = e.target.value;
+          }}
           onKeyDown={(e) => {
             if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
               e.preventDefault();
@@ -285,19 +477,52 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
                 </motion.button>
               ) : <div />}
             </AnimatePresence>
+            <AnimatePresence>
+              {listening && (
+                <motion.div
+                  key="waves"
+                  initial={{ opacity: 0, width: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, width: "auto", scale: 1 }}
+                  exit={{ opacity: 0, width: 0, scale: 0.8 }}
+                  className="flex items-center justify-center gap-[3px] h-3.5 px-2 overflow-hidden"
+                >
+                  <motion.div animate={{ height: ["40%", "100%", "40%"] }} transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: 0.0 }} className="w-0.5 bg-red-500 rounded-full" />
+                  <motion.div animate={{ height: ["60%", "100%", "30%", "60%"] }} transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut", delay: 0.2 }} className="w-0.5 bg-red-500 rounded-full" />
+                  <motion.div animate={{ height: ["30%", "80%", "40%"] }} transition={{ duration: 0.7, repeat: Infinity, ease: "easeInOut", delay: 0.4 }} className="w-0.5 bg-red-500 rounded-full" />
+                </motion.div>
+              )}
+            </AnimatePresence>
+            
+            <div className="relative flex items-center justify-center">
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={handleDictate}
+                disabled={!enabled}
+                aria-label={listening ? "Stop Dictation" : "Dictate"}
+                className={`relative z-10 p-1 rounded-full transition-colors ${
+                  listening 
+                    ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10" 
+                    : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-500 dark:hover:text-zinc-200"
+                }`}
+              >
+                {listening ? <Square className="w-3.5 h-3.5" fill="currentColor" /> : <Mic className="w-3.5 h-3.5" />}
+              </motion.button>
+            </div>
+
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
-              onClick={handleDictate}
-              disabled={!enabled || listening}
-              aria-label="Dictate"
-              className={`p-1 rounded transition-colors ${
-                listening 
-                  ? "text-red-500 bg-red-50 dark:bg-red-500/10 animate-pulse" 
+              onClick={handleSourceTTS}
+              disabled={!sourceText}
+              aria-label={isSpeakingSource ? "Stop listening" : "Listen to source text"}
+              className={`p-1 rounded-full transition-colors disabled:opacity-30 ${
+                isSpeakingSource 
+                  ? "text-red-500 bg-red-50 dark:bg-red-500/10" 
                   : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-500 dark:hover:text-zinc-200"
               }`}
             >
-              <Mic className="w-3.5 h-3.5" />
+              {isSpeakingSource ? <Square className="w-3.5 h-3.5 fill-current" /> : <Volume2 className="w-3.5 h-3.5" />}
             </motion.button>
           </div>
           <span className={`text-[11px] font-mono ml-auto transition-colors font-semibold tracking-wide ${isOverLimit ? "text-red-600 dark:text-red-500" : "text-zinc-500 dark:text-zinc-500"}`}>
@@ -372,6 +597,20 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
             className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 disabled:opacity-30 disabled:cursor-not-allowed p-1.5 rounded-lg hover:bg-zinc-200/50 dark:hover:bg-white/[0.08] transition-colors"
           >
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.92 }}
+            onClick={handleTTS}
+            disabled={!result}
+            aria-label={isSpeakingTarget ? "Stop reading" : "Read translation aloud"}
+            className={`p-1.5 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
+              isSpeakingTarget 
+                ? "text-red-500 bg-red-50 dark:bg-red-500/10" 
+                : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-200/50 dark:hover:bg-white/[0.08]"
+            }`}
+          >
+            {isSpeakingTarget ? <Square className="w-3.5 h-3.5 fill-current" /> : <Volume2 className="w-3.5 h-3.5" />}
           </motion.button>
           {/* Keyboard shortcut hint */}
           {!result && !translating && (

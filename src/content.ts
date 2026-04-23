@@ -1,8 +1,11 @@
 (() => {
   "use strict";
+  if ((window as any).tmt_injected) return;
+  (window as any).tmt_injected = true;
 
   let overlay: HTMLDivElement | null = null;
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  let activeRecognition: any = null;
   
   let pageSourceLang = "English";
   let pageTargetLang = "Nepali";
@@ -424,32 +427,56 @@
       }
     } else if (msg.action === "tmt_start_speech") {
       const SR = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-      if (!SR) { sendResponse({ error: "Speech API not available in Brave/Chromium." }); return; }
+      if (!SR) { sendResponse({ error: "comming soon" }); return; }
       
-      const recognition = new SR();
-      recognition.lang = msg.lang || "en-US";
-      recognition.interimResults = false;
-      recognition.maxAlternatives = 1;
+      if (activeRecognition) {
+        try { activeRecognition.stop(); } catch (e) {}
+      }
+
+      activeRecognition = new SR();
+      activeRecognition.lang = msg.lang || "en-US";
+      activeRecognition.interimResults = true;
+      activeRecognition.continuous = true;
+      activeRecognition.maxAlternatives = 1;
       
-      recognition.onresult = (e: any) => {
-        const transcript = e.results[0][0].transcript;
-        chrome.runtime.sendMessage({ action: "tmt_speech_result", transcript });
+      activeRecognition.onresult = (e: any) => {
+        let finalTranscript = "";
+        let interimTranscript = "";
+        for (let i = e.resultIndex; i < e.results.length; ++i) {
+          if (e.results[i].isFinal) {
+            finalTranscript += e.results[i][0].transcript;
+          } else {
+            interimTranscript += e.results[i][0].transcript;
+          }
+        }
+        chrome.runtime.sendMessage({ action: "tmt_speech_result", finalTranscript, interimTranscript }).catch(() => {});
       };
       
-      recognition.onerror = (e: any) => {
-        chrome.runtime.sendMessage({ action: "tmt_speech_error", error: e.error });
+      activeRecognition.onerror = (e: any) => {
+        chrome.runtime.sendMessage({ action: "tmt_speech_error", error: e.error }).catch(() => {});
       };
       
-      recognition.onend = () => {
-        chrome.runtime.sendMessage({ action: "tmt_speech_end" });
+      activeRecognition.onend = () => {
+        chrome.runtime.sendMessage({ action: "tmt_speech_end" }).catch(() => {});
+        activeRecognition = null;
       };
       
       try {
-        recognition.start();
+        activeRecognition.start();
         sendResponse({ started: true });
       } catch (err: any) {
         sendResponse({ error: err.message });
+        activeRecognition = null;
       }
+      return true;
+    } else if (msg.action === "tmt_stop_speech") {
+      if (activeRecognition) {
+        try {
+          activeRecognition.stop();
+        } catch (e) {}
+        activeRecognition = null;
+      }
+      sendResponse({ stopped: true });
       return true;
     }
   });
