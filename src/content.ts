@@ -6,6 +6,8 @@
   let overlay: HTMLDivElement | null = null;
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let activeRecognition: any = null;
+  let micTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
+  const MIC_TIMEOUT_MS = 60_000; // Auto-stop mic after 60 seconds
   
   let pageSourceLang = "English";
   let pageTargetLang = "Nepali";
@@ -408,7 +410,10 @@
     removeOverlay();
   }, { passive: true });
 
-  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    // Only accept messages from this extension's own popup/background
+    if (sender.id !== chrome.runtime.id) return;
+
     if (!extensionEnabled && msg.action !== "tmt_get_page_status") return;
     if (msg.action === "tmt_page_translate") {
       pageSourceLang = msg.sourceLang || "English";
@@ -427,17 +432,26 @@
       }
     } else if (msg.action === "tmt_start_speech") {
       const SR = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-      if (!SR) { sendResponse({ error: "comming soon" }); return; }
+      if (!SR) { sendResponse({ error: "Speech recognition is not supported in this browser." }); return; }
       
       if (activeRecognition) {
         try { activeRecognition.stop(); } catch (e) {}
       }
+      if (micTimeoutTimer) { clearTimeout(micTimeoutTimer); micTimeoutTimer = null; }
 
       activeRecognition = new SR();
       activeRecognition.lang = msg.lang || "en-US";
       activeRecognition.interimResults = true;
       activeRecognition.continuous = true;
       activeRecognition.maxAlternatives = 1;
+
+      // Auto-stop microphone after 60 seconds to prevent indefinite recording
+      micTimeoutTimer = setTimeout(() => {
+        if (activeRecognition) {
+          try { activeRecognition.stop(); } catch (e) {}
+        }
+        chrome.runtime.sendMessage({ action: "tmt_speech_error", error: "mic-timeout" }).catch(() => {});
+      }, MIC_TIMEOUT_MS);
       
       activeRecognition.onresult = (e: any) => {
         let finalTranscript = "";
@@ -453,10 +467,12 @@
       };
       
       activeRecognition.onerror = (e: any) => {
+        if (micTimeoutTimer) { clearTimeout(micTimeoutTimer); micTimeoutTimer = null; }
         chrome.runtime.sendMessage({ action: "tmt_speech_error", error: e.error }).catch(() => {});
       };
       
       activeRecognition.onend = () => {
+        if (micTimeoutTimer) { clearTimeout(micTimeoutTimer); micTimeoutTimer = null; }
         chrome.runtime.sendMessage({ action: "tmt_speech_end" }).catch(() => {});
         activeRecognition = null;
       };
@@ -470,6 +486,7 @@
       }
       return true;
     } else if (msg.action === "tmt_stop_speech") {
+      if (micTimeoutTimer) { clearTimeout(micTimeoutTimer); micTimeoutTimer = null; }
       if (activeRecognition) {
         try {
           activeRecognition.stop();

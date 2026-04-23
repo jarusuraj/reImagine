@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence, type Variants } from "motion/react";
-import { Globe, RotateCcw, ArrowRight, Sparkles } from "lucide-react";
+import { Globe, RotateCcw, ArrowRight, Sparkles, ShieldAlert } from "lucide-react";
 import { Header }         from "@/components/Header";
 import { Workbench }      from "@/components/Workbench";
 import { HistorySidebar } from "@/components/HistorySidebar";
@@ -22,6 +22,7 @@ const fadeUp: Variants = {
 export default function App() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [pageTranslated, setPageTranslated] = useState(false);
+  const [showPrivacyWarning, setShowPrivacyWarning] = useState(false);
   const { history, add, remove, clear } = useHistory();
 
   const [sourceLang, setSourceLang] = useState<Language>("English");
@@ -65,6 +66,27 @@ export default function App() {
   };
 
   const handlePageTranslate = () => {
+    if (typeof chrome === "undefined" || !chrome.storage) {
+      // Dev mode: skip warning
+      sendToTab({ action: "tmt_page_translate", sourceLang, targetLang });
+      setPageTranslated(true);
+      return;
+    }
+    chrome.storage.local.get(["tmt_privacy_ack"], (res) => {
+      if (res.tmt_privacy_ack) {
+        sendToTab({ action: "tmt_page_translate", sourceLang, targetLang });
+        setPageTranslated(true);
+      } else {
+        setShowPrivacyWarning(true);
+      }
+    });
+  };
+
+  const confirmPageTranslate = () => {
+    if (typeof chrome !== "undefined" && chrome.storage) {
+      chrome.storage.local.set({ tmt_privacy_ack: true });
+    }
+    setShowPrivacyWarning(false);
     sendToTab({ action: "tmt_page_translate", sourceLang, targetLang });
     setPageTranslated(true);
   };
@@ -90,6 +112,52 @@ export default function App() {
         enabled={enabled}
         toggleEnabled={toggleEnabled}
       />
+
+      {/* Privacy Warning Modal */}
+      <AnimatePresence>
+        {showPrivacyWarning && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
+          >
+            <motion.div
+              initial={{ scale: 0.92, opacity: 0, y: 8 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.92, opacity: 0, y: 8 }}
+              transition={{ type: "spring", stiffness: 400, damping: 30 }}
+              className="w-full bg-white dark:bg-[#111] rounded-2xl border border-zinc-200 dark:border-white/[0.1] shadow-2xl p-5"
+            >
+              <div className="flex items-start gap-3 mb-4">
+                <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-500/15 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0 mt-0.5">
+                  <ShieldAlert className="w-4.5 h-4.5" />
+                </div>
+                <div>
+                  <h2 className="text-[14px] font-bold text-zinc-900 dark:text-zinc-100 leading-tight">Privacy Notice</h2>
+                  <p className="text-[12px] text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
+                    All visible text on this page will be sent to the reImagine translation server. Avoid using this on pages with sensitive information (banking, personal data, passwords).
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowPrivacyWarning(false)}
+                  className="flex-1 py-2 rounded-lg border border-zinc-200 dark:border-white/[0.1] text-[13px] font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/[0.06] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmPageTranslate}
+                  className="flex-1 py-2 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-black text-[13px] font-semibold hover:bg-black dark:hover:bg-zinc-200 transition-colors"
+                >
+                  I Understand, Translate
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <motion.main
         variants={stagger}

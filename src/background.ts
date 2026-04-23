@@ -21,7 +21,10 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   }).catch(() => {});
 });
 
-chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
+chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+  // Only accept messages from this extension's own pages and content scripts
+  if (sender.id !== chrome.runtime.id) return;
+
   if (msg.action === "tmt_translate_quick") {
     handleQuickTranslate(msg.text, msg.sourceLang, msg.targetLang).then(reply);
     return true;

@@ -116,6 +116,8 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
         setDictateError("no Internet");
       } else if (payload.error === "no-speech") {
         setDictateError("No speech detected. Please try again and speak clearly.");
+      } else if (payload.error === "mic-timeout") {
+        setDictateError("Microphone auto-stopped after 60 seconds. Click the mic to start again.");
       } else if (payload.error === "aborted") {
         // User or system aborted, no error message needed
       } else {
@@ -179,6 +181,9 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
   const handleClear = () => {
     setSourceText("");
     existingTextRef.current = "";
+    window.speechSynthesis.cancel();
+    setIsSpeakingSource(false);
+    setIsSpeakingTarget(false);
     reset();
     textareaRef.current?.focus();
   };
@@ -514,7 +519,7 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               onClick={handleSourceTTS}
-              disabled={!sourceText}
+              disabled={!sourceText && !isSpeakingSource}
               aria-label={isSpeakingSource ? "Stop listening" : "Listen to source text"}
               className={`p-1 rounded-full transition-colors disabled:opacity-30 ${
                 isSpeakingSource 
@@ -602,7 +607,7 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
             whileHover={{ scale: 1.08 }}
             whileTap={{ scale: 0.92 }}
             onClick={handleTTS}
-            disabled={!result}
+            disabled={!result && !isSpeakingTarget}
             aria-label={isSpeakingTarget ? "Stop reading" : "Read translation aloud"}
             className={`p-1.5 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
               isSpeakingTarget 
