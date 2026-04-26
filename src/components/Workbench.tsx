@@ -506,22 +506,6 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
                 </motion.button>
               ) : <div />}
             </AnimatePresence>
-            <AnimatePresence>
-              {listening && (
-                <motion.div
-                  key="waves"
-                  initial={{ opacity: 0, width: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, width: "auto", scale: 1 }}
-                  exit={{ opacity: 0, width: 0, scale: 0.8 }}
-                  className="flex items-center justify-center gap-[3px] h-3.5 px-2 overflow-hidden"
-                >
-                  <motion.div animate={{ height: ["40%", "100%", "40%"] }} transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: 0.0 }} className="w-0.5 bg-red-500 rounded-full" />
-                  <motion.div animate={{ height: ["60%", "100%", "30%", "60%"] }} transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut", delay: 0.2 }} className="w-0.5 bg-red-500 rounded-full" />
-                  <motion.div animate={{ height: ["30%", "80%", "40%"] }} transition={{ duration: 0.7, repeat: Infinity, ease: "easeInOut", delay: 0.4 }} className="w-0.5 bg-red-500 rounded-full" />
-                </motion.div>
-              )}
-            </AnimatePresence>
-
             <input
               type="file"
               accept=".txt"
@@ -539,6 +523,22 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
             >
               <FileText className="w-3.5 h-3.5" />
             </motion.button>
+
+            <AnimatePresence>
+              {listening && (
+                <motion.div
+                  key="waves"
+                  initial={{ opacity: 0, width: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, width: "auto", scale: 1 }}
+                  exit={{ opacity: 0, width: 0, scale: 0.8 }}
+                  className="flex items-center justify-center gap-[3px] h-3.5 px-2 overflow-hidden"
+                >
+                  <motion.div animate={{ height: ["40%", "100%", "40%"] }} transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: 0.0 }} className="w-0.5 bg-red-500 rounded-full" />
+                  <motion.div animate={{ height: ["60%", "100%", "30%", "60%"] }} transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut", delay: 0.2 }} className="w-0.5 bg-red-500 rounded-full" />
+                  <motion.div animate={{ height: ["30%", "80%", "40%"] }} transition={{ duration: 0.7, repeat: Infinity, ease: "easeInOut", delay: 0.4 }} className="w-0.5 bg-red-500 rounded-full" />
+                </motion.div>
+              )}
+            </AnimatePresence>
             
             <div className="relative flex items-center justify-center">
               <motion.button
