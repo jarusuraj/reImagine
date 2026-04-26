@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Copy, Check, ArrowDownUp, X, Keyboard, Mic, Square, Volume2 } from "lucide-react";
+import { Copy, Check, ArrowDownUp, X, Keyboard, Mic, Square, Volume2, FileText } from "lucide-react";
 import { LangSelector } from "./LangSelector";
 import { useTranslation } from "@/hooks/useTranslation";
 import type { Language, TranslationResult } from "@/types";
@@ -29,6 +29,7 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const localRecognitionRef = useRef<any>(null);
   const existingTextRef = useRef("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { result, translating, error, run, reset } = useTranslation();
 
@@ -138,6 +139,21 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
       chrome.storage.session.remove("tmt_speech_active");
     }
   }
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      if (text) {
+        setSourceText(text);
+        existingTextRef.current = text;
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
 
   const handleTranslate = async () => {
     if (!sourceText.trim() || sourceText.length > MAX_CHARS || translating) return;
@@ -505,6 +521,24 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
                 </motion.div>
               )}
             </AnimatePresence>
+
+            <input
+              type="file"
+              accept=".txt"
+              ref={fileInputRef}
+              style={{ display: "none" }}
+              onChange={handleFileUpload}
+            />
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={!enabled}
+              aria-label="Upload text file"
+              className="p-1 rounded-full transition-colors text-zinc-500 hover:text-zinc-900 dark:text-zinc-500 dark:hover:text-zinc-200"
+            >
+              <FileText className="w-3.5 h-3.5" />
+            </motion.button>
             
             <div className="relative flex items-center justify-center">
               <motion.button

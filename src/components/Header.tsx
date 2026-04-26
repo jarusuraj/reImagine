@@ -9,23 +9,9 @@ interface Props {
   toggleEnabled: () => void;
 }
 
-/** Inline SVG wordmark — crisp at every size, no image dependency. */
 function LogoMark() {
   return (
-    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <rect width="28" height="28" rx="7" fill="#1e293b" />
-      {/* Bold "R" glyph */}
-      <path
-        d="M8 7h6.5a4 4 0 0 1 0 8H8V7Zm0 8h4l4 6"
-        stroke="#f1f5f9"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-      />
-      {/* Accent dot */}
-      <circle cx="20" cy="20" r="2" fill="#3b82f6" />
-    </svg>
+    <img src="/logo.jpg" alt="reImagine Logo" className="w-7 h-7 rounded-md object-cover" />
   );
 }
 

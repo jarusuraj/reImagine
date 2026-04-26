@@ -57,5 +57,13 @@ export function useHistory() {
     }
   }, []);
 
-  return { history, add, remove, clear };
+  const importHistory = useCallback((imported: HistoryEntry[]) => {
+    setHistory((prev) => {
+      const merged = [...imported, ...prev];
+      const unique = Array.from(new Map(merged.map(item => [item.id, item])).values());
+      return unique.sort((a, b) => b.timestamp - a.timestamp).slice(0, MAX_ENTRIES);
+    });
+  }, []);
+
+  return { history, add, remove, clear, importHistory };
 }

@@ -1,5 +1,5 @@
-import { X, Trash2, History, Copy, Check } from "lucide-react";
-import { useState } from "react";
+import { X, Trash2, History, Copy, Check, Download, Upload } from "lucide-react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import type { HistoryEntry } from "@/types";
 
@@ -10,6 +10,7 @@ interface Props {
   onDelete: (id: string) => void;
   onClear:  () => void;
   onSelect: (entry: HistoryEntry) => void;
+  onImport: (entries: HistoryEntry[]) => void;
 }
 
 function relativeTime(timestamp: number): string {
@@ -21,7 +22,39 @@ function relativeTime(timestamp: number): string {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-export function HistorySidebar({ open, onClose, entries, onDelete, onClear, onSelect }: Props) {
+export function HistorySidebar({ open, onClose, entries, onDelete, onClear, onSelect, onImport }: Props) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExport = () => {
+    if (entries.length === 0) return;
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(entries, null, 2));
+    const downloadAnchorNode = document.createElement("a");
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", `reimagine_history_${new Date().toISOString().slice(0, 10)}.json`);
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        const parsed = JSON.parse(text);
+        if (Array.isArray(parsed)) {
+          onImport(parsed);
+        }
+      } catch (err) {
+        console.error("Failed to parse history JSON", err);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
   return (
     <AnimatePresence>
       {open && (
@@ -40,15 +73,39 @@ export function HistorySidebar({ open, onClose, entries, onDelete, onClear, onSe
             transition={{ type: "spring", stiffness: 400, damping: 32 }}
             className="fixed right-0 top-0 bottom-0 w-[300px] bg-white dark:bg-[#0a0a0a] border-l border-zinc-200/80 dark:border-white/[0.08] z-50 flex flex-col shadow-2xl"
           >
-            <div className="flex items-center justify-between px-4 py-3.5 border-b border-zinc-100 dark:border-white/[0.06] shrink-0">
-              <h2 className="font-semibold text-zinc-900 dark:text-zinc-100 text-[14px]">History</h2>
-              <button
-                onClick={onClose}
-                aria-label="Close history"
-                className="p-1.5 text-zinc-500 hover:text-zinc-900 dark:text-zinc-500 dark:hover:text-zinc-200 rounded-md hover:bg-zinc-100 dark:hover:bg-white/[0.05] transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
+            <div className="flex flex-col gap-2 px-4 py-3.5 border-b border-zinc-100 dark:border-white/[0.06] shrink-0">
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold text-zinc-900 dark:text-zinc-100 text-[14px]">History</h2>
+                <button
+                  onClick={onClose}
+                  aria-label="Close history"
+                  className="p-1.5 text-zinc-500 hover:text-zinc-900 dark:text-zinc-500 dark:hover:text-zinc-200 rounded-md hover:bg-zinc-100 dark:hover:bg-white/[0.05] transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleExport}
+                  disabled={entries.length === 0}
+                  className="flex-1 py-1.5 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 bg-zinc-50 dark:bg-white/[0.02] hover:bg-zinc-100 dark:hover:bg-white/[0.05] rounded-md transition-colors border border-zinc-200/50 dark:border-white/[0.04] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Download className="w-3.5 h-3.5" /> Export
+                </button>
+                <input
+                  type="file"
+                  accept=".json"
+                  className="hidden"
+                  ref={fileInputRef}
+                  onChange={handleImport}
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex-1 py-1.5 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 bg-zinc-50 dark:bg-white/[0.02] hover:bg-zinc-100 dark:hover:bg-white/[0.05] rounded-md transition-colors border border-zinc-200/50 dark:border-white/[0.04]"
+                >
+                  <Upload className="w-3.5 h-3.5" /> Import
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
@@ -75,7 +132,7 @@ export function HistorySidebar({ open, onClose, entries, onDelete, onClear, onSe
             </div>
 
             {entries.length > 0 && (
-              <div className="p-3 border-t border-zinc-100 dark:border-white/[0.06] shrink-0">
+              <div className="p-3 border-t border-zinc-100 dark:border-white/[0.06] shrink-0 space-y-2">
                 <button
                   onClick={onClear}
                   className="w-full py-2 text-[12px] font-semibold text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
@@ -113,10 +170,10 @@ function HistoryCard({ entry, onDelete, onSelect }: { entry: HistoryEntry; onDel
           <span className="text-[10px] font-medium text-zinc-600 dark:text-zinc-500">{relativeTime(entry.timestamp)}</span>
         </div>
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={handleCopy} aria-label="Copy" className="p-1 text-zinc-500 hover:text-zinc-900 dark:text-zinc-500 dark:hover:text-zinc-200 rounded-md hover:bg-zinc-200/50 dark:hover:bg-white/[0.05] transition-colors">
+          <button onClick={(e) => { e.stopPropagation(); handleCopy(); }} aria-label="Copy" className="p-1 text-zinc-500 hover:text-zinc-900 dark:text-zinc-500 dark:hover:text-zinc-200 rounded-md hover:bg-zinc-200/50 dark:hover:bg-white/[0.05] transition-colors">
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
           </button>
-          <button onClick={() => onDelete(entry.id)} aria-label="Delete" className="p-1 text-zinc-500 hover:text-red-500 dark:text-zinc-500 dark:hover:text-red-400 rounded-md hover:bg-zinc-200/50 dark:hover:bg-white/[0.05] transition-colors">
+          <button onClick={(e) => { e.stopPropagation(); onDelete(entry.id); }} aria-label="Delete" className="p-1 text-zinc-500 hover:text-red-500 dark:text-zinc-500 dark:hover:text-red-400 rounded-md hover:bg-zinc-200/50 dark:hover:bg-white/[0.05] transition-colors">
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>

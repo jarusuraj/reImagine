@@ -23,7 +23,7 @@ export default function App() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [pageTranslated, setPageTranslated] = useState(false);
   const [showPrivacyWarning, setShowPrivacyWarning] = useState(false);
-  const { history, add, remove, clear } = useHistory();
+  const { history, add, remove, clear, importHistory } = useHistory();
 
   const [sourceLang, setSourceLang] = useState<Language>("English");
   const [targetLang, setTargetLang] = useState<Language>("Nepali");
@@ -292,6 +292,7 @@ export default function App() {
         onDelete={remove}
         onClear={clear}
         onSelect={handleHistorySelect}
+        onImport={importHistory}
       />
     </div>
   );
