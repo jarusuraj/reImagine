@@ -72,23 +72,19 @@ export default function App() {
       const id = tab?.id;
       const url = tab?.url || "";
 
-      // Only works on real http/https pages — not chrome:// or edge:// system pages
+      // HTTP/HTTPS site ma matra kaam gara
       if (!id || !url.startsWith("http")) return;
 
       chrome.tabs.sendMessage(id, payload, (_res) => {
-        const err = chrome.runtime.lastError?.message ?? "";
-        // Only re-inject if the content script is genuinely absent.
-        // "message port closed" is harmless (listener responded without sendResponse).
+        const err = chrome.runtime.lastError?.message;
         if (!err || !err.includes("Receiving end does not exist")) return;
 
-        // Content script not present (tab was open before extension install/reload).
-        // Inject it on demand, then retry once.
+        // Script xaina vane pathau
         if (!chrome.scripting) return;
         chrome.scripting.executeScript(
           { target: { tabId: id }, files: ["content.js"] },
           () => {
-            if (chrome.runtime.lastError) return; // Page blocked scripting — give up
-            // Give the IIFE a moment to initialize before sending the message
+            if (chrome.runtime.lastError) return;
             setTimeout(() => {
               chrome.tabs.sendMessage(id, payload).catch(() => {});
             }, 300);
@@ -100,7 +96,6 @@ export default function App() {
 
   const handlePageTranslate = () => {
     if (typeof chrome === "undefined" || !chrome.storage) {
-      // Dev mode: skip warning
       sendToTab({ action: "tmt_page_translate", sourceLang, targetLang });
       setPageTranslated(true);
       return;
@@ -146,7 +141,6 @@ export default function App() {
         toggleEnabled={toggleEnabled}
       />
 
-      {/* Privacy Warning Modal */}
       <AnimatePresence>
         {showPrivacyWarning && (
           <motion.div
@@ -198,7 +192,6 @@ export default function App() {
         animate="show"
         className="px-3 py-3 space-y-3 flex-1 flex flex-col relative z-10 min-h-0"
       >
-        {/* Hero: Live Page Translate */}
         <motion.div variants={fadeUp} className="relative group shrink-0">
           <AnimatePresence mode="wait">
             {!pageTranslated ? (

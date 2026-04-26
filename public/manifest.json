@@ -7,7 +7,12 @@
   "host_permissions": ["<all_urls>"],
   "action": {
     "default_popup": "index.html",
-    "default_icon": "logo.jpg"
+    "default_icon": {
+      "16": "icon16.jpg",
+      "32": "icon32.jpg",
+      "48": "icon48.jpg",
+      "128": "icon128.jpg"
+    }
   },
   "background": {
     "service_worker": "background.js",
@@ -22,8 +27,9 @@
     }
   ],
   "icons": {
-    "16":  "logo.jpg",
-    "48":  "logo.jpg",
-    "128": "logo.jpg"
+    "16":  "icon16.jpg",
+    "32":  "icon32.jpg",
+    "48":  "icon48.jpg",
+    "128": "icon128.jpg"
   }
 }

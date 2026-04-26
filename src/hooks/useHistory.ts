@@ -20,7 +20,7 @@ export function useHistory() {
         }
       });
     } else {
-      // Fallback for local dev (no extension context)
+      // Local dev vane fallback use gara
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) setHistory(JSON.parse(raw));
     }
@@ -49,6 +49,7 @@ export function useHistory() {
   }, []);
 
   const clear = useCallback(() => {
+    // Saph gar
     setHistory([]);
     if (chromeStorageAvailable()) {
       chrome.storage.local.remove(STORAGE_KEY);

@@ -21,7 +21,6 @@ export function Header({ onHistory, historyOpen, enabled, toggleEnabled }: Props
 
   return (
     <header className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-200/80 dark:border-white/[0.08] bg-white/80 dark:bg-[#0a0a0a]/80 backdrop-blur-md shrink-0 transition-colors z-20">
-      {/* Brand */}
       <div className="flex items-center gap-2.5">
         <div className={`shrink-0 transition-opacity ${!enabled ? "opacity-40" : ""}`}>
           <LogoMark />
@@ -41,9 +40,7 @@ export function Header({ onHistory, historyOpen, enabled, toggleEnabled }: Props
         </div>
       </div>
 
-      {/* Controls */}
       <div className="flex items-center gap-0.5">
-        {/* Power toggle */}
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.92 }}
@@ -59,7 +56,6 @@ export function Header({ onHistory, historyOpen, enabled, toggleEnabled }: Props
           <Power className="w-4 h-4" />
         </motion.button>
 
-        {/* Theme toggle */}
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.92 }}
@@ -72,7 +68,6 @@ export function Header({ onHistory, historyOpen, enabled, toggleEnabled }: Props
           </motion.div>
         </motion.button>
 
-        {/* History toggle */}
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.92 }}

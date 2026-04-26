@@ -19,22 +19,21 @@ function applyTheme(isDark: boolean) {
 export function useTheme() {
   const [theme, setThemeState] = useState<Theme>("light");
 
-  // Load persisted theme on mount
   useEffect(() => {
+    // Shuru ma load gara
     if (chromeStorageAvailable()) {
       chrome.storage.local.get([THEME_KEY], (res) => {
         const saved = res[THEME_KEY] as Theme | undefined;
         if (saved) setThemeState(saved);
       });
     } else {
-      // Fallback for local dev
       const saved = localStorage.getItem(THEME_KEY) as Theme | null;
       if (saved) setThemeState(saved);
     }
   }, []);
 
-  // Apply and persist whenever theme changes
   useEffect(() => {
+    // Theme change huda save ra apply gara
     if (chromeStorageAvailable()) {
       chrome.storage.local.set({ [THEME_KEY]: theme });
     } else {

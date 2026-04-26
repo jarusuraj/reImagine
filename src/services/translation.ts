@@ -15,11 +15,6 @@ interface TMTResponse {
   timestamp?: string;
 }
 
-/**
- * Splits text into sentences for per-sentence API calls.
- * If no sentence-ending punctuation exists (e.g. nav labels, headings),
- * the entire text is treated as one sentence to avoid empty API calls.
- */
 function splitIntoSentences(text: string): string[] {
   const trimmed = text.trim();
   if (!trimmed) return [];
@@ -79,7 +74,7 @@ async function translateSingleSentence(
 
   const data = await response.json() as TMTResponse;
 
-  // The TMT API always returns HTTP 200 — must check message_type for actual success/failure
+  // TMT API check garna message_type hera
   if (data.message_type === "FAIL") {
     throw new Error(data.message || "Translation failed");
   }
@@ -97,7 +92,7 @@ export async function translate(
   if (!sanitizedText) throw new Error("Please enter text to translate.");
   if (!TMT_URL || !TMT_KEY) throw new Error("TMT API is not configured. Check your credentials.");
 
-  // Resolve "Auto" to a concrete language — "auto" is not a valid API src_lang
+  // Auto vane paila language detect gara
   const actualSourceLang: Language =
     sourceLang === "Auto" ? detectLanguage(sanitizedText) : sourceLang;
 

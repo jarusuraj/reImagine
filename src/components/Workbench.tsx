@@ -45,7 +45,7 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
   useEffect(() => {
     if (typeof chrome === "undefined" || !chrome.storage) return;
 
-    // Check if speech recognition is in progress (popup was closed and reopened)
+    // Popup reload huda speech check gara
     chrome.storage.session.get(["tmt_speech_pending", "tmt_speech_active"], (res) => {
       if (res.tmt_speech_active) {
         setListening(true);
@@ -53,7 +53,7 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
       processSpeechPayload(res.tmt_speech_pending);
     });
 
-    // Listen for live updates (when popup stays open) via direct messaging to avoid storage throttling
+    // Live updates ko lagi msg listener hala
     const msgListener = (msg: any) => {
       if (msg.action === "tmt_speech_result") {
         processSpeechPayload({ status: "result", finalTranscript: msg.finalTranscript, interimTranscript: msg.interimTranscript });
@@ -65,7 +65,7 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
     };
     chrome.runtime.onMessage.addListener(msgListener);
 
-    // Also listen to storage for state persistence if popup was closed
+    // Popup reload huda storage check gara
     const storageListener = (changes: any, area: string) => {
       if (area !== "session") return;
       if (changes.tmt_speech_active && !changes.tmt_speech_active.newValue) {
@@ -90,10 +90,10 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
     
     loadVoices();
     
-    // Voices are loaded asynchronously in many browsers
+    // Voice load gara
     window.speechSynthesis.onvoiceschanged = loadVoices;
     
-    // Polling fallback for browsers where onvoiceschanged is unreliable
+    // Voice load bhayena vane wait gara
     const interval = setInterval(() => {
       const voices = window.speechSynthesis.getVoices();
       if (voices.length > 0) {
@@ -160,12 +160,12 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
   const handleTranslate = async () => {
     if (!sourceText.trim() || sourceText.length > MAX_CHARS || translating) return;
     
-    // Auto-detect language purely based on character set + heuristics
+    // TMT API check garna message_type hera
     let detectedSourceLang = sourceLang;
     if (sourceLang === "Auto") {
       const isDevanagari = /[\u0900-\u097F]/.test(sourceText);
       if (isDevanagari) {
-        // Common Tamang markers (Devanagari)
+        // Tamang ko words check gara
         const tamangMarkers = [
           "मुबा", "ताबा", "लासो", "नबा", "ह्या", "खिम", "गिबा", "ब्रोबा", "क्यु", "सुङ्बा",
           "च्यु", "मेवा", "खई", "ह्याम्बो", "निसा", "सेबा", "पापा", "आमा", "अाङा",
@@ -176,7 +176,7 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
       } else {
         detectedSourceLang = "English";
       }
-      onSourceLangChange(detectedSourceLang); // Update UI to detected language
+      onSourceLangChange(detectedSourceLang);
     }
 
     const res = await run(sourceText, detectedSourceLang, targetLang);
@@ -239,7 +239,7 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
     stopAllSpeech();
     const langCode = LANG_MAP[targetLang] || "ne-NP";
     
-    // Maximized voice selection
+    // List bata ramro voice select gara
     const preferredVoice = 
       availableVoices.find(v => v.lang === langCode && !v.localService && (v.name.includes("Natural") || v.name.includes("Neural") || v.name.includes("Enhanced") || v.name.includes("Premium"))) ||
       availableVoices.find(v => v.lang === langCode && (v.name.includes("Google") || v.name.includes("Online"))) ||
@@ -250,7 +250,7 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
       availableVoices.find(v => (v.lang.includes("ne") || v.name.toLowerCase().includes("nepali")) && targetLang === "Nepali") ||
       availableVoices.find(v => v.lang.startsWith("hi") && targetLang === "Nepali");
     
-    // If we have a voice, use Web Speech API; otherwise, use external TTS URL (e.g. for Brave)
+    // Brave ko lagi fallback audio use gara
     if (preferredVoice) {
       const utterance = new SpeechSynthesisUtterance(result.translation);
       utterance.lang = langCode;
@@ -263,7 +263,7 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
       utterance.onerror = () => setIsSpeakingTarget(false);
       window.speechSynthesis.speak(utterance);
     } else {
-      // Fallback: External Audio URL
+      // Voice xaina vane audio lyaune
       const tl = targetLang === "Nepali" || targetLang === "Tamang" ? "ne" : (targetLang === "English" ? "en" : "hi");
       const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${tl}&client=tw-ob&q=${encodeURIComponent(result.translation)}`;
       const audio = new Audio(url);
@@ -308,7 +308,7 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
       utterance.onerror = () => setIsSpeakingSource(false);
       window.speechSynthesis.speak(utterance);
     } else {
-      // Fallback: External Audio URL
+      // Voice xaina vane audio link pathau
       const tl = sourceLang === "Nepali" || sourceLang === "Tamang" ? "ne" : (sourceLang === "English" ? "en" : "hi");
       const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${tl}&client=tw-ob&q=${encodeURIComponent(sourceText)}`;
       const audio = new Audio(url);
@@ -354,7 +354,7 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
       setDictateError("");
       existingTextRef.current = sourceText;
       
-      // Persist the listening state so it survives popup close/reopen
+      // Reload huda kaam lagne gari state save gara
       chrome.storage.session.set({ tmt_speech_active: true });
       
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -376,7 +376,7 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
               lang: LANG_MAP[sourceLang] || "en-US" 
             }, (response) => {
               if (chrome.runtime.lastError) {
-                // Content script not loaded, inject it
+                // HTTP/HTTPS site ma matra kaam gara
                 chrome.scripting.executeScript({
                   target: { tabId: id },
                   files: ["content.js"]
@@ -417,7 +417,7 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
       return;
     }
 
-    // Fallback for localhost / local testing without extension context
+    // Local testing ko lagi fallback banau
     try {
       // @ts-ignore
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -491,7 +491,6 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
     <div
       className="flex flex-col flex-1 min-h-0 border border-zinc-200/80 dark:border-white/[0.08] rounded-xl bg-white dark:bg-[#0a0a0a] overflow-hidden shadow-sm relative z-10"
     >
-      {/* Source section */}
       <div className="p-3 pb-2 border-b border-zinc-100 dark:border-white/[0.06] bg-zinc-50/50 dark:bg-transparent shrink-0">
         <LangSelector
           value={sourceLang}

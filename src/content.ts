@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  // Clean up any old UI elements if this is a re-injection after an extension reload
+  // Reload huda purano UI hata
   document.getElementById("tmt-overlay")?.remove();
   document.getElementById("tmt-page-prompt")?.remove();
   document.querySelector(".tmt-status-pill")?.remove();
@@ -20,7 +20,7 @@
   let isDraggingGlobal = false;
   const MIC_TIMEOUT_MS = 60_000;
 
-  // Trusted Types policy for strict CSP sites (e.g. GitHub)
+  // Security ko lagi policy bana
   let ttPolicy: any;
   if (typeof (window as any).trustedTypes !== "undefined" && (window as any).trustedTypes.createPolicy) {
     try {
@@ -62,7 +62,6 @@
     });
   }
 
-  // ─── Selection Overlay ────────────────────────────────────────────────────
   
   function makeDraggable(el: HTMLElement, handleSelector: string) {
     const handle = el.querySelector(handleSelector) as HTMLElement;
@@ -130,7 +129,7 @@
   function showResult(translation: string, detectedLang?: string) {
     if (!overlay) return;
     const langLabel = detectedLang ?? "Auto";
-    // escapeHtml() is used for all user-derived / API-derived content injected via innerHTML
+    // Security ko lagi HTML escape gara
     overlay.innerHTML = `
       <div class="tmt-result">
         <div class="tmt-result-header">
@@ -157,7 +156,7 @@
     `;
 
     overlay.querySelector(".tmt-close")?.addEventListener("click", removeOverlay);
-    
+
     overlay.querySelector(".tmt-tts-btn")?.addEventListener("click", () => {
       if (currentAudio) { currentAudio.pause(); currentAudio = null; }
       window.speechSynthesis.cancel();
@@ -165,7 +164,7 @@
       const langMap: Record<string, string> = { "English": "en", "Nepali": "ne", "Tamang": "ne", "Hindi": "hi" };
       const langCode = langMap[pageTargetLang] || "ne";
 
-      // Try local synthesis first
+      // Paila local voice check garne
       const voices = window.speechSynthesis.getVoices();
       const preferredVoice = voices.find(v => v.lang.startsWith(langCode));
 
@@ -176,7 +175,7 @@
         utterance.rate = 1.0;
         window.speechSynthesis.speak(utterance);
       } else {
-        // Fallback to Google TTS URL
+        // Local voice xaina vane google bata audio lyaune
         const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${langCode}&client=tw-ob&q=${encodeURIComponent(translation)}`;
         currentAudio = new Audio(url);
         currentAudio.play().catch(() => {});
@@ -221,8 +220,6 @@
     overlay = null;
   }
 
-  // Security: all user/API content injected into innerHTML is passed through escapeHtml().
-  // nodeValue assignments in translateNode() are inherently safe and do NOT use innerHTML.
   function escapeHtml(str: string): string {
     const div = document.createElement("div");
     div.textContent = str;
@@ -242,7 +239,6 @@
     });
   }
 
-  // ─── Page Translation State ───────────────────────────────────────────────
 
   const originalValues = new WeakMap<Text, string>();
   let translatedNodes = new WeakSet<Text>();
@@ -251,14 +247,6 @@
   let nodesDone = 0;
   let totalNodes = 0;
 
-  /**
-   * Collects all translatable text nodes from a DOM subtree.
-   *
-   * Skips:
-   *   - Tag-level: SCRIPT, STYLE, NOSCRIPT, TEXTAREA, INPUT, SELECT, CODE, PRE
-   *   - contenteditable elements — modifying them would corrupt user-editable areas
-   *   - Whitespace-only / single-character text nodes
-   */
   function collectTextNodes(root: Element): Text[] {
     const skipTags = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEXTAREA", "INPUT", "SELECT", "CODE", "PRE"]);
     const nodes: Text[] = [];
@@ -267,13 +255,13 @@
       if (node.nodeType === Node.ELEMENT_NODE) {
         const el = node as Element;
         if (skipTags.has(el.tagName)) return;
-        // Skip contenteditable — translating these would corrupt user-editable content
+        // Edit garna milne thau xoda
         if (el.getAttribute("contenteditable") !== null) return;
       }
 
       if (node.nodeType === Node.TEXT_NODE) {
         const val = node.nodeValue || "";
-        // Skip whitespace-only and single-char nodes — they produce empty API calls
+        // Khali thau translate nagarne
         if (val.trim().length > 1) nodes.push(node as Text);
         return;
       }
@@ -285,14 +273,13 @@
     return nodes;
   }
 
-  // ─── Status Pill ──────────────────────────────────────────────────────────
 
   function mountStatusPill() {
-    // No longer mounting on start as per user request to hide the loading bar
+    // Loading bar luka
   }
 
   function updateStatusPill(_done: number, _total: number) {
-    // No longer updating progress visually
+    // Progress update nagarne
   }
 
   function completeStatusPill() {
@@ -338,7 +325,6 @@
     totalNodes = 0;
   }
 
-  // ─── Node Translation ─────────────────────────────────────────────────────
 
   async function translateNode(node: Text, retries = 2): Promise<void> {
     if (translatedNodes.has(node) || !pageActive) return;
@@ -365,8 +351,7 @@
             targetLang: pageTargetLang,
           }, (res) => {
             if (chrome.runtime.lastError) {
-              // Service worker was terminated and restarted. Retry — the new SW instance
-              // will handle the message. After retries are exhausted, skip the node.
+              // Service worker restart bhako bhaye feri try garne
               if (retries > 0 && pageActive) {
                 setTimeout(() => translateNode(node, retries - 1).then(resolve), 700);
               } else {
@@ -390,7 +375,7 @@
             resolve();
           });
         } catch (e) {
-          // If extension context is invalidated (extension was reloaded), this throws synchronously.
+          // Reload bhako vane stop garne
           // The old script should just quietly die.
           pageActive = false;
           resolve();
@@ -400,20 +385,6 @@
     });
   }
 
-  // ─── Page Translation Orchestration ──────────────────────────────────────
-
-  /**
-   * Translates the entire page using a hybrid strategy:
-   *
-   *   Phase 1 — Immediate: translate all nodes currently in the viewport synchronously.
-   *   This fixes the IntersectionObserver miss on above-the-fold content.
-   *
-   *   Phase 2 — Lazy: observe remaining below-the-fold nodes with IntersectionObserver.
-   *   Nodes enter the viewport as the user scrolls and are translated on demand.
-   *
-   * Both phases use batches of 5 with a 150ms gap between batches to avoid
-   * rate-limiting on content-heavy pages.
-   */
   async function translatePage() {
     if (pageActive || !document.body) return;
     pageActive = true;
@@ -439,18 +410,16 @@
         return;
       }
 
-      // Ping the service worker every 25s to prevent MV3 idle termination.
+      // Service worker active rakhna
       keepAlive = setInterval(() => {
         try {
           chrome.runtime.sendMessage({ action: "tmt_keepalive" }).catch(() => {});
         } catch (e) {
-          // If the extension context is invalidated (e.g. extension was reloaded), 
-          // this throws synchronously. We just clear the interval.
           clearInterval(keepAlive);
         }
       }, 25_000) as unknown as number;
 
-      // Partition nodes: in-viewport (immediate) vs below-the-fold (lazy)
+      // Dekhine ra nadekhine thau xutyau
       const viewportNodes: Text[] = [];
       const lazyNodes: Text[] = [];
 
@@ -463,7 +432,7 @@
         }
       }
 
-      // Phase 1: translate above-the-fold nodes immediately in batches of 5
+      // Dekhine thau paila translate garne
       const BATCH_SIZE = 5;
       const BATCH_DELAY_MS = 150;
 
@@ -476,14 +445,14 @@
         }
       }
 
-      // Phase 2: lazily translate below-the-fold nodes as user scrolls
+      // Nadekhine thau scroll garda translate garne
       if (lazyNodes.length === 0) {
         clearInterval(keepAlive);
         if (pageActive) completeStatusPill();
         return;
       }
 
-      // Group lazy nodes by parent element
+      // Parent anusar group banau
       const parentMap = new Map<HTMLElement, Text[]>();
       for (const node of lazyNodes) {
         if (!node.parentElement) continue;
@@ -492,7 +461,7 @@
         parentMap.set(node.parentElement, existing);
       }
 
-      // Buffer pending elements to process in rate-limited batches
+      // Rate limit ko lagi buffer gara
       let pendingElements: HTMLElement[] = [];
       let lazyTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -520,14 +489,13 @@
         });
         if (hasNew) {
           if (lazyTimer) clearTimeout(lazyTimer);
-          // Small debounce to batch multiple simultaneously visible entries
+          // Msg pathuna wait gara
           lazyTimer = setTimeout(() => { flushPending(); }, 100);
         }
       }, { rootMargin: "300px 0px", threshold: 0.01 });
 
       parentMap.forEach((_, el) => observer?.observe(el));
 
-      // Store observer reference on the body so restorePage() can clean it up
       (document.body as any)._tmtObserver = observer;
 
     } catch (err) {
@@ -537,7 +505,7 @@
       if (keepAlive) clearInterval(keepAlive);
       if (observer) observer.disconnect();
       
-      // Update the status pill to show the error
+      // Error pill dekha
       if (!statusPill) mountStatusPill();
       const statusText = document.querySelector('.tmt-status-text');
       if (statusText) statusText.textContent = `Translation stopped: ${err instanceof Error ? err.message : 'Unknown error'}`;
@@ -548,7 +516,7 @@
     pageActive = false;
     document.body.removeAttribute("data-tmt-active");
 
-    // Clean up lazy observer if it exists
+    // Lazy observer clean gara
     const obs = (document.body as any)._tmtObserver as IntersectionObserver | undefined;
     if (obs) {
       obs.disconnect();
@@ -562,11 +530,10 @@
       }
     });
 
-    // Reset so the page can be re-translated in the same session
+    // Feri translate garna milne gari reset gara
     translatedNodes = new WeakSet<Text>();
   }
 
-  // ─── Auto Language Prompt ─────────────────────────────────────────────────
 
   function checkLanguagePrompt() {
     if (!extensionEnabled) return;
@@ -616,7 +583,7 @@
 
     const prompt = document.createElement("div");
     prompt.id = "tmt-page-prompt";
-    // Static HTML template — no user/API data interpolated, so innerHTML is safe here
+    // Prompt mount gara
     prompt.innerHTML = safeHTML(`
       <div class="tmt-prompt-content">
         <div class="tmt-prompt-icon">
@@ -649,7 +616,6 @@
     });
   }
 
-  // ─── DOM Event Listeners ──────────────────────────────────────────────────
 
   document.addEventListener("mouseup", (e) => {
     if (!extensionEnabled || isDraggingGlobal) return;
@@ -676,10 +642,9 @@
     removeOverlay();
   }, { passive: true });
 
-  // ─── Extension Message Handler ────────────────────────────────────────────
 
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-    // Security: reject messages from any origin other than this extension
+    // Afnai extension ko msg ho ki haina check gara
     if (sender.id !== chrome.runtime.id) return;
 
     if (!extensionEnabled && msg.action !== "tmt_get_page_status") return;
