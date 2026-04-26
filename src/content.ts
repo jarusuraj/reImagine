@@ -247,39 +247,43 @@
   let nodesDone = 0;
   let totalNodes = 0;
 
-  function collectTextNodes(root: Element): Text[] {
-    const skipTags = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEXTAREA", "INPUT", "SELECT", "CODE", "PRE"]);
+  function collectTextNodes(root: Node): Text[] {
+    const skip = /^(SCRIPT|STYLE|NOSCRIPT|TEXTAREA|INPUT|SELECT|CODE|PRE)$/;
     const nodes: Text[] = [];
-
     const walk = (node: Node) => {
       if (node.nodeType === Node.ELEMENT_NODE) {
         const el = node as Element;
-        if (skipTags.has(el.tagName)) return;
-        // Edit garna milne thau xoda
-        if (el.getAttribute("contenteditable") !== null) return;
+        if (skip.test(el.tagName) || el.hasAttribute("contenteditable")) return;
       }
-
-      if (node.nodeType === Node.TEXT_NODE) {
-        const val = node.nodeValue || "";
-        // Khali thau translate nagarne
-        if (val.trim().length > 1) nodes.push(node as Text);
-        return;
+      if (node.nodeType === Node.TEXT_NODE && (node.nodeValue || "").trim().length > 1) {
+        nodes.push(node as Text);
+      } else {
+        node.childNodes.forEach(walk);
       }
-
-      node.childNodes.forEach(walk);
     };
-
     walk(root);
     return nodes;
   }
 
 
+
   function mountStatusPill() {
-    // Loading bar luka
+    if (statusPill) return;
+    statusPill = document.createElement("div");
+    statusPill.className = "tmt-status-pill";
+    statusPill.innerHTML = safeHTML(`
+      <div class="tmt-progress-bg" style="width: 0%"></div>
+      <div class="tmt-status-icon"></div>
+      <div class="tmt-status-text">Translating page...</div>
+    `) as any;
+    document.body.appendChild(statusPill);
   }
 
-  function updateStatusPill(_done: number, _total: number) {
-    // Progress update nagarne
+  function updateStatusPill(done: number, total: number) {
+    if (!statusPill) return;
+    const progress = total > 0 ? Math.round((done / total) * 100) : 0;
+    const bg = statusPill.querySelector(".tmt-progress-bg") as HTMLElement | null;
+    if (bg) bg.style.width = `${progress}%`;
   }
 
   function completeStatusPill() {
@@ -287,7 +291,7 @@
     statusPill = document.createElement("div");
     statusPill.className = "tmt-status-pill";
     statusPill.innerHTML = safeHTML(`
-      <div class="tmt-progress-bg" style="width: 100%; background: rgba(16, 185, 129, 0.1)"></div>
+      <div class="tmt-progress-bg" style="width: 100%"></div>
       <div class="tmt-status-icon tmt-done">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
       </div>
@@ -328,61 +332,34 @@
 
   async function translateNode(node: Text, retries = 2): Promise<void> {
     if (translatedNodes.has(node) || !pageActive) return;
-
     const val = node.nodeValue || "";
     const orig = val.trim();
-
-    if (!orig) {
-      translatedNodes.add(node);
-      nodesDone++;
-      updateStatusPill(nodesDone, totalNodes);
-      return;
-    }
-
+    if (!orig) { translatedNodes.add(node); nodesDone++; updateStatusPill(nodesDone, totalNodes); return; }
     if (!originalValues.has(node)) originalValues.set(node, val);
 
-    return new Promise<void>((resolve) => {
-      const attempt = () => {
-        try {
-          chrome.runtime.sendMessage({
-            action: "tmt_translate_quick",
-            text: orig,
-            sourceLang: pageSourceLang,
-            targetLang: pageTargetLang,
-          }, (res) => {
-            if (chrome.runtime.lastError) {
-              // Service worker restart bhako bhaye feri try garne
-              if (retries > 0 && pageActive) {
-                setTimeout(() => translateNode(node, retries - 1).then(resolve), 700);
-              } else {
-                nodesDone++;
-                updateStatusPill(nodesDone, totalNodes);
-                if (nodesDone >= totalNodes) completeStatusPill();
-                resolve();
-              }
-              return;
-            }
+    try {
+      const res = await new Promise<any>((resolve) => {
+        chrome.runtime.sendMessage({ action: "tmt_translate_quick", text: orig, sourceLang: pageSourceLang, targetLang: pageTargetLang }, resolve);
+      });
 
-            if (res?.translation && pageActive) {
-              const prefix = val.match(/^\s*/)?.[0] || "";
-              const suffix = val.match(/\s*$/)?.[0] || "";
-              node.nodeValue = prefix + res.translation + suffix;
-              translatedNodes.add(node);
-            }
-            nodesDone++;
-            updateStatusPill(nodesDone, totalNodes);
-            if (nodesDone >= totalNodes) completeStatusPill();
-            resolve();
-          });
-        } catch (e) {
-          // Reload bhako vane stop garne
-          // The old script should just quietly die.
-          pageActive = false;
-          resolve();
+      if (chrome.runtime.lastError || !res?.translation) {
+        if (retries > 0 && pageActive) {
+          await new Promise(r => setTimeout(r, 700));
+          return translateNode(node, retries - 1);
         }
-      };
-      attempt();
-    });
+      } else if (pageActive) {
+        const prefix = val.match(/^\s*/)?.[0] || "";
+        const suffix = val.match(/\s*$/)?.[0] || "";
+        node.nodeValue = prefix + res.translation + suffix;
+        translatedNodes.add(node);
+      }
+    } catch (e) {
+      pageActive = false;
+    } finally {
+      nodesDone++;
+      updateStatusPill(nodesDone, totalNodes);
+      if (nodesDone >= totalNodes) completeStatusPill();
+    }
   }
 
   async function translatePage() {
@@ -419,83 +396,63 @@
         }
       }, 25_000) as unknown as number;
 
-      // Dekhine ra nadekhine thau xutyau
+      // Viewport splitting
       const viewportNodes: Text[] = [];
       const lazyNodes: Text[] = [];
-
       for (const node of allNodes) {
-        const rect = node.parentElement?.getBoundingClientRect();
-        if (rect && rect.top < window.innerHeight + 300 && rect.bottom > -300) {
-          viewportNodes.push(node);
-        } else {
-          lazyNodes.push(node);
-        }
+        const r = node.parentElement?.getBoundingClientRect();
+        if (r && r.top < window.innerHeight + 300 && r.bottom > -300) viewportNodes.push(node);
+        else lazyNodes.push(node);
       }
 
-      // Dekhine thau paila translate garne
-      const BATCH_SIZE = 5;
-      const BATCH_DELAY_MS = 150;
-
-      for (let i = 0; i < viewportNodes.length; i += BATCH_SIZE) {
-        if (!pageActive) { clearInterval(keepAlive); return; }
-        const batch = viewportNodes.slice(i, i + BATCH_SIZE);
-        await Promise.all(batch.map(n => translateNode(n)));
-        if (i + BATCH_SIZE < viewportNodes.length) {
-          await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
-        }
+      // Translate viewport
+      const BATCH = 5;
+      for (let i = 0; i < viewportNodes.length; i += BATCH) {
+        if (!pageActive) return;
+        await Promise.all(viewportNodes.slice(i, i + BATCH).map(n => translateNode(n)));
+        if (i + BATCH < viewportNodes.length) await new Promise(r => setTimeout(r, 150));
       }
 
-      // Nadekhine thau scroll garda translate garne
       if (lazyNodes.length === 0) {
         clearInterval(keepAlive);
         if (pageActive) completeStatusPill();
         return;
       }
 
-      // Parent anusar group banau
+      // Lazy load
       const parentMap = new Map<HTMLElement, Text[]>();
-      for (const node of lazyNodes) {
-        if (!node.parentElement) continue;
-        const existing = parentMap.get(node.parentElement) ?? [];
-        existing.push(node);
-        parentMap.set(node.parentElement, existing);
-      }
+      lazyNodes.forEach(n => {
+        if (n.parentElement) {
+          const arr = parentMap.get(n.parentElement) || [];
+          arr.push(n);
+          parentMap.set(n.parentElement, arr);
+        }
+      });
 
-      // Rate limit ko lagi buffer gara
-      let pendingElements: HTMLElement[] = [];
-      let lazyTimer: ReturnType<typeof setTimeout> | null = null;
-
-      const flushPending = async () => {
+      let pending: HTMLElement[] = [];
+      let timer: any;
+      const flush = async () => {
         if (!pageActive) return;
-        const toProcess = pendingElements.splice(0);
-        const batchNodes = toProcess.flatMap(el => parentMap.get(el) ?? []);
-        for (let i = 0; i < batchNodes.length; i += BATCH_SIZE) {
-          if (!pageActive) { clearInterval(keepAlive); return; }
-          await Promise.all(batchNodes.slice(i, i + BATCH_SIZE).map(n => translateNode(n)));
-          if (i + BATCH_SIZE < batchNodes.length) {
-            await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
-          }
+        const nodes = pending.splice(0).flatMap(el => parentMap.get(el) || []);
+        for (let i = 0; i < nodes.length; i += BATCH) {
+          if (!pageActive) return;
+          await Promise.all(nodes.slice(i, i + BATCH).map(n => translateNode(n)));
+          if (i + BATCH < nodes.length) await new Promise(r => setTimeout(r, 150));
         }
       };
 
       observer = new IntersectionObserver((entries) => {
-        let hasNew = false;
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            observer?.unobserve(entry.target);
-            pendingElements.push(entry.target as HTMLElement);
-            hasNew = true;
-          }
+        entries.filter(e => e.isIntersecting).forEach(e => {
+          observer?.unobserve(e.target);
+          pending.push(e.target as HTMLElement);
         });
-        if (hasNew) {
-          if (lazyTimer) clearTimeout(lazyTimer);
-          // Msg pathuna wait gara
-          lazyTimer = setTimeout(() => { flushPending(); }, 100);
+        if (pending.length) {
+          clearTimeout(timer);
+          timer = setTimeout(flush, 100);
         }
       }, { rootMargin: "300px 0px", threshold: 0.01 });
 
       parentMap.forEach((_, el) => observer?.observe(el));
-
       (document.body as any)._tmtObserver = observer;
 
     } catch (err) {
@@ -505,8 +462,7 @@
       if (keepAlive) clearInterval(keepAlive);
       if (observer) observer.disconnect();
       
-      // Error pill dekha
-      if (!statusPill) mountStatusPill();
+      // Error pill dekha (removed unused mount call)
       const statusText = document.querySelector('.tmt-status-text');
       if (statusText) statusText.textContent = `Translation stopped: ${err instanceof Error ? err.message : 'Unknown error'}`;
     }
