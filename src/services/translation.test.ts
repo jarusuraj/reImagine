@@ -20,7 +20,10 @@ describe("Translation Service (Unit Test)", () => {
   it("should successfully translate valid text", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ translated_text: "नमस्ते" })
+      json: async () => ({ 
+        message_type: "SUCCESS",
+        output: "नमस्ते" 
+      })
     });
 
     const result = await translate("Hello", "English", "Nepali");
@@ -35,6 +38,29 @@ describe("Translation Service (Unit Test)", () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
+  it("should successfully translate multiple sentences", async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ 
+          message_type: "SUCCESS",
+          output: "नमस्ते।" 
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ 
+          message_type: "SUCCESS",
+          output: "कस्तो छ?" 
+        })
+      });
+
+    const result = await translate("Hello. How are you?", "English", "Nepali");
+
+    expect(result.translation).toBe("नमस्ते। कस्तो छ?");
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
   it("should throw an error for empty text", async () => {
     await expect(translate("   ", "English", "Nepali"))
       .rejects
@@ -43,15 +69,17 @@ describe("Translation Service (Unit Test)", () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it("should handle 429 Rate Limit responses properly", async () => {
+  it("should handle TMT failure messages properly", async () => {
     mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 429,
-      json: async () => ({})
+      ok: true,
+      json: async () => ({
+        message_type: "FAIL",
+        message: "Internal model error"
+      })
     });
 
-    await expect(translate("Too fast", "English", "Nepali"))
+    await expect(translate("Error case", "English", "Nepali"))
       .rejects
-      .toThrow("Rate limit exceeded. Please wait a moment.");
+      .toThrow("Internal model error");
   });
 });

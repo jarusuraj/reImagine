@@ -47,8 +47,8 @@ export default defineConfig(({ mode }) => {
     test: {
       environment: "jsdom",
       env: {
-        TMT_API_URL: env.TMT_API_URL || "https://api.tmt.example.com",
-        TMT_API_KEY: env.TMT_API_KEY || "test-api-key"
+        TMT_API_URL: env.TMT_API_URL,
+        TMT_API_KEY: env.TMT_API_KEY
       }
     }
   };

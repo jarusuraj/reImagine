@@ -12,11 +12,12 @@ interface Props {
   targetLang: Language;
   onSourceLangChange: (lang: Language) => void;
   onTargetLangChange: (lang: Language) => void;
+  initialText?: string;
 }
 
 const MAX_CHARS = 5000;
 
-export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceLangChange, onTargetLangChange }: Props) {
+export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceLangChange, onTargetLangChange, initialText }: Props) {
   const [sourceText, setSourceText] = useState("");
   const [copied, setCopied] = useState(false);
   const [listening, setListening] = useState(false);
@@ -30,6 +31,13 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
   const existingTextRef = useRef("");
 
   const { result, translating, error, run, reset } = useTranslation();
+
+  useEffect(() => {
+    if (initialText) {
+      setSourceText(initialText);
+      existingTextRef.current = initialText;
+    }
+  }, [initialText]);
 
   useEffect(() => {
     if (typeof chrome === "undefined" || !chrome.storage) return;
@@ -584,8 +592,13 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
         </div>
 
         {(error || dictateError) && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-2 text-[12px] font-medium text-red-600 dark:text-red-400">
-            {error || dictateError}
+          <motion.div 
+            initial={{ opacity: 0, y: 4 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            className="mt-2 p-2 rounded-lg bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 text-[12px] font-medium text-red-600 dark:text-red-400 flex items-center gap-2"
+          >
+            <span className="shrink-0">⚠</span>
+            <span>{error || dictateError}</span>
           </motion.div>
         )}
       </div>

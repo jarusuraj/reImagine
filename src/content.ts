@@ -107,8 +107,13 @@
 
   function showError(msg: string) {
     if (!overlay) return;
-    overlay.innerHTML = `<div class="tmt-error-msg">⚠ ${escapeHtml(msg)}</div>`;
-    setTimeout(removeOverlay, 3000);
+    overlay.innerHTML = `
+      <div class="tmt-error-card">
+        <div class="tmt-error-icon">⚠</div>
+        <div class="tmt-error-text">${escapeHtml(msg)}</div>
+      </div>
+    `;
+    setTimeout(removeOverlay, 4000);
   }
 
   function removeOverlay() {
@@ -135,9 +140,13 @@
     });
   }
 
-  const ORIG_ATTR = "data-tmt-original";
+  const originalValues = new WeakMap<Text, string>();
+  const translatedNodes = new WeakSet<Text>();
+  let lazyObserver: IntersectionObserver | null = null;
   let pageActive  = false;
   let statusPill: HTMLDivElement | null = null;
+  let nodesDone = 0;
+  let totalNodes = 0;
 
   function collectTextNodes(root: Element): Text[] {
     const skip = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEXTAREA", "INPUT", "SELECT", "CODE", "PRE"]);
@@ -229,9 +238,48 @@
   function removeStatusPill() {
     statusPill?.remove();
     statusPill = null;
+    nodesDone = 0;
+    totalNodes = 0;
   }
 
-  const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+  async function translateNode(node: Text) {
+    if (translatedNodes.has(node) || !pageActive) return;
+    
+    const val = node.nodeValue || "";
+    const orig = val.trim();
+    if (!orig) {
+      translatedNodes.add(node);
+      nodesDone++;
+      updateStatusPill(nodesDone, totalNodes);
+      return;
+    }
+
+    if (!originalValues.has(node)) {
+      originalValues.set(node, val);
+    }
+
+    return new Promise<void>((resolve) => {
+      chrome.runtime.sendMessage({ 
+        action: "tmt_translate_quick", 
+        text: orig,
+        sourceLang: pageSourceLang,
+        targetLang: pageTargetLang
+      }, (res) => {
+        if (!chrome.runtime.lastError && res?.translation && pageActive) {
+          const prefix = val.match(/^\s*/)?.[0] || "";
+          const suffix = val.match(/\s*$/)?.[0] || "";
+          node.nodeValue = prefix + res.translation + suffix;
+          translatedNodes.add(node);
+        }
+        nodesDone++;
+        updateStatusPill(nodesDone, totalNodes);
+        if (nodesDone >= totalNodes) completeStatusPill();
+        resolve();
+      });
+    });
+  }
+
+
 
   async function translatePage() {
     if (pageActive) return;
@@ -244,64 +292,47 @@
     }
 
     const nodes = collectTextNodes(document.body);
-    const total = nodes.length;
-    const BATCH = 5; 
-    let done = 0;
+    totalNodes = nodes.length;
+    nodesDone = 0;
 
     mountStatusPill();
-    updateStatusPill(0, total);
+    updateStatusPill(0, totalNodes);
 
-    for (let i = 0; i < nodes.length; i += BATCH) {
-      if (!pageActive) break;
+    // IntersectionObserver to translate nodes as they scroll into view
+    // We observe the parent elements because Text nodes aren't observable
+    lazyObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const element = entry.target as HTMLElement;
+          const elementNodes = collectTextNodes(element);
+          elementNodes.forEach(node => translateNode(node));
+          lazyObserver?.unobserve(element);
+        }
+      });
+    }, {
+      rootMargin: "300px 0px", // Translate content before it actually appears (1-2 screen heights ahead)
+      threshold: 0.01
+    });
 
-      await Promise.all(
-        nodes.slice(i, i + BATCH).map(
-          (node) =>
-            new Promise<void>((resolve) => {
-              const orig = node.nodeValue?.trim();
-              if (!orig) { done++; resolve(); return; }
-              if (!node.parentElement?.hasAttribute(ORIG_ATTR)) {
-                node.parentElement?.setAttribute(ORIG_ATTR, node.nodeValue ?? "");
-              }
-              chrome.runtime.sendMessage({ 
-                action: "tmt_translate_quick", 
-                text: orig,
-                sourceLang: pageSourceLang,
-                targetLang: pageTargetLang
-              }, (res) => {
-                if (chrome.runtime.lastError) { 
-                  done++; 
-                  updateStatusPill(done, total); 
-                  resolve(); 
-                  return; 
-                }
-                if (res?.translation) node.nodeValue = res.translation;
-                done++;
-                updateStatusPill(done, total);
-                resolve();
-              });
-            }),
-        ),
-      );
-
-      await delay(50);
-    }
-
-    if (pageActive) {
-      completeStatusPill();
-    }
+    // Observe all elements that contain text
+    const parents = new Set<HTMLElement>();
+    nodes.forEach(node => {
+      if (node.parentElement) parents.add(node.parentElement);
+    });
+    
+    parents.forEach(p => lazyObserver?.observe(p));
   }
 
   function restorePage() {
-    document.querySelectorAll(`[${ORIG_ATTR}]`).forEach((el) => {
-      const orig = el.getAttribute(ORIG_ATTR);
-      for (const child of el.childNodes) {
-        if (child.nodeType === Node.TEXT_NODE) {
-          child.nodeValue = orig ?? "";
-          break;
-        }
+    if (lazyObserver) {
+      lazyObserver.disconnect();
+      lazyObserver = null;
+    }
+    const allTextNodes = collectTextNodes(document.body);
+    allTextNodes.forEach((node) => {
+      if (originalValues.has(node)) {
+        node.nodeValue = originalValues.get(node) || "";
       }
-      el.removeAttribute(ORIG_ATTR);
     });
     pageActive = false;
   }

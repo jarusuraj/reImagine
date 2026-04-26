@@ -9,6 +9,7 @@ interface Props {
   entries:  HistoryEntry[];
   onDelete: (id: string) => void;
   onClear:  () => void;
+  onSelect: (entry: HistoryEntry) => void;
 }
 
 function relativeTime(timestamp: number): string {
@@ -20,7 +21,7 @@ function relativeTime(timestamp: number): string {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-export function HistorySidebar({ open, onClose, entries, onDelete, onClear }: Props) {
+export function HistorySidebar({ open, onClose, entries, onDelete, onClear, onSelect }: Props) {
   return (
     <AnimatePresence>
       {open && (
@@ -66,7 +67,7 @@ export function HistorySidebar({ open, onClose, entries, onDelete, onClear }: Pr
                       exit={{ opacity: 0, scale: 0.95 }}
                       layout
                     >
-                      <HistoryCard entry={entry} onDelete={onDelete} />
+                      <HistoryCard entry={entry} onDelete={onDelete} onSelect={(e) => { onSelect(e); onClose(); }} />
                     </motion.div>
                   ))}
                 </AnimatePresence>
@@ -90,7 +91,7 @@ export function HistorySidebar({ open, onClose, entries, onDelete, onClear }: Pr
   );
 }
 
-function HistoryCard({ entry, onDelete }: { entry: HistoryEntry; onDelete: (id: string) => void }) {
+function HistoryCard({ entry, onDelete, onSelect }: { entry: HistoryEntry; onDelete: (id: string) => void; onSelect: (entry: HistoryEntry) => void }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -100,7 +101,10 @@ function HistoryCard({ entry, onDelete }: { entry: HistoryEntry; onDelete: (id: 
   };
 
   return (
-    <div className="p-2.5 bg-zinc-50/50 dark:bg-white/[0.02] rounded-xl border border-zinc-200/80 dark:border-white/[0.06] group transition-colors hover:border-zinc-300 dark:hover:border-white/[0.1]">
+    <div 
+      onClick={() => onSelect(entry)}
+      className="p-2.5 bg-zinc-50/50 dark:bg-white/[0.02] rounded-xl border border-zinc-200/80 dark:border-white/[0.06] group transition-all hover:border-zinc-300 dark:hover:border-white/[0.1] hover:bg-zinc-100 dark:hover:bg-white/[0.05] cursor-pointer"
+    >
       <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] font-bold tracking-wide text-zinc-600 dark:text-zinc-400 bg-white dark:bg-white/[0.04] border border-zinc-200/80 dark:border-white/[0.08] px-1.5 py-0.5 rounded-md">

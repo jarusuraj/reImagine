@@ -28,6 +28,14 @@ export default function App() {
   const [sourceLang, setSourceLang] = useState<Language>("English");
   const [targetLang, setTargetLang] = useState<Language>("Nepali");
   const [enabled, setEnabled] = useState(true);
+  const [revisitedText, setRevisitedText] = useState("");
+
+  const handleHistorySelect = (entry: any) => {
+    setSourceLang(entry.sourceLang);
+    setTargetLang(entry.targetLang);
+    setRevisitedText(entry.sourceText);
+    setHistoryOpen(false);
+  };
 
   useEffect(() => {
     if (typeof chrome === "undefined" || !chrome.storage) return;
@@ -243,6 +251,7 @@ export default function App() {
             targetLang={targetLang}
             onSourceLangChange={setSourceLang}
             onTargetLangChange={setTargetLang}
+            initialText={revisitedText}
           />
         </motion.div>
 
@@ -257,6 +266,7 @@ export default function App() {
         entries={history}
         onDelete={remove}
         onClear={clear}
+        onSelect={handleHistorySelect}
       />
     </div>
   );

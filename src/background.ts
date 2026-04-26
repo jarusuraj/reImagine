@@ -1,14 +1,10 @@
-import { LANG_CODE } from "./constants/languages";
+import { translate } from "./services/translation";
 import type { Language } from "./types";
-
-const TMT_URL = import.meta.env.TMT_API_URL;
-const TMT_KEY = import.meta.env.TMT_API_KEY;
-const TIMEOUT_MS = 15000;
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
-    id:       "tmt-translate",
-    title:    "Translate with reImagine",
+    id: "tmt-translate",
+    title: "Translate with reImagine",
     contexts: ["selection"],
   });
 });
@@ -17,7 +13,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId !== "tmt-translate" || !info.selectionText || !tab?.id) return;
   chrome.tabs.sendMessage(tab.id, {
     action: "tmt_context_translate",
-    text:   info.selectionText,
+    text: info.selectionText,
   }).catch(() => {});
 });
 
@@ -31,7 +27,13 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   }
 
   if (msg.action === "tmt_speech_result") {
-    chrome.storage.session.set({ tmt_speech_pending: { status: "result", finalTranscript: msg.finalTranscript, interimTranscript: msg.interimTranscript } });
+    chrome.storage.session.set({
+      tmt_speech_pending: {
+        status: "result",
+        finalTranscript: msg.finalTranscript,
+        interimTranscript: msg.interimTranscript,
+      },
+    });
     return;
   }
   if (msg.action === "tmt_speech_error") {
@@ -50,57 +52,57 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   }
 });
 
+// In-memory cache to speed up repetitive translations and reduce API load
+const translationCache = new Map<string, string>();
+
+// Concurrency control: Browser limits to 6 connections per domain. 
+// We manage our own queue of 5 to keep one slot open for the UI/other tasks.
+const queue: (() => Promise<void>)[] = [];
+let activeRequests = 0;
+const MAX_CONCURRENT = 5;
+
+async function processQueue() {
+  if (activeRequests >= MAX_CONCURRENT || queue.length === 0) return;
+  const task = queue.shift();
+  if (task) {
+    activeRequests++;
+    await task();
+    activeRequests--;
+    processQueue();
+  }
+}
+
 async function handleQuickTranslate(
   text: string,
   sourceLang: Language = "English",
-  targetLang: Language = "Nepali"
+  targetLang: Language = "Nepali",
+  retries = 2
 ): Promise<{ translation?: string; error?: string }> {
-  try {
-    const sanitizedText = text.trim();
-    if (!sanitizedText) {
-      throw new Error("No text selected.");
-    }
-
-    if (!TMT_URL || !TMT_KEY) {
-      throw new Error("TMT API is not configured.");
-    }
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
-    
-    const res = await fetch(TMT_URL, {
-      method:  "POST",
-      headers: {
-        "Content-Type":  "application/json",
-        "Authorization": `Bearer ${TMT_KEY}`,
-      },
-      body: JSON.stringify({
-        text: sanitizedText,
-        source_lang: LANG_CODE[sourceLang],
-        target_lang: LANG_CODE[targetLang],
-      }),
-      signal: controller.signal,
-    });
-    
-    clearTimeout(timeoutId);
-
-    if (!res.ok) {
-      if (res.status === 401) throw new Error("API Key Invalid");
-      if (res.status === 429) throw new Error("Rate Limit Exceeded");
-      throw new Error(`API Error ${res.status}`);
-    }
-    
-    const data = await res.json() as { translated_text?: string };
-    
-    if (!data || typeof data.translated_text !== "string") {
-      throw new Error("Invalid API response.");
-    }
-
-    return { translation: data.translated_text };
-  } catch (error: any) {
-    if (error.name === "AbortError") {
-      return { error: "Request timed out." };
-    }
-    return { error: error.message || "Translation failed" };
+  const cacheKey = `${sourceLang}:${targetLang}:${text}`;
+  if (translationCache.has(cacheKey)) {
+    return { translation: translationCache.get(cacheKey) };
   }
+
+  return new Promise((resolve) => {
+    const task = async () => {
+      try {
+        const res = await translate(text, sourceLang, targetLang);
+        if (res.translation) {
+          translationCache.set(cacheKey, res.translation);
+        }
+        resolve({ translation: res.translation });
+      } catch (error: any) {
+        // Retry logic for transient errors (like 503 or 429)
+        if (retries > 0 && (error.message.includes("overwhelmed") || error.message.includes("Slow down"))) {
+          await new Promise(r => setTimeout(r, 500)); // Wait 500ms before retry
+          const retryRes = await handleQuickTranslate(text, sourceLang, targetLang, retries - 1);
+          resolve(retryRes);
+        } else {
+          resolve({ error: error.message || "Translation failed" });
+        }
+      }
+    };
+    queue.push(task);
+    processQueue();
+  });
 }
