@@ -16,6 +16,8 @@
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let activeRecognition: any = null;
   let micTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
+  let currentAudio: HTMLAudioElement | null = null;
+  let isDraggingGlobal = false;
   const MIC_TIMEOUT_MS = 60_000;
 
   // Trusted Types policy for strict CSP sites (e.g. GitHub)
@@ -61,6 +63,38 @@
   }
 
   // ─── Selection Overlay ────────────────────────────────────────────────────
+  
+  function makeDraggable(el: HTMLElement, handleSelector: string) {
+    const handle = el.querySelector(handleSelector) as HTMLElement;
+    if (!handle) return;
+    handle.style.cursor = "grab";
+    let startX = 0, startY = 0, initialLeft = 0, initialTop = 0;
+
+    const onMouseDown = (e: MouseEvent) => {
+      if ((e.target as HTMLElement).closest("button")) return;
+      e.preventDefault();
+      handle.style.cursor = "grabbing";
+      startX = e.clientX;
+      startY = e.clientY;
+      initialLeft = el.offsetLeft;
+      initialTop = el.offsetTop;
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+    };
+    const onMouseMove = (e: MouseEvent) => {
+      isDraggingGlobal = true;
+      el.style.left = `${initialLeft + (e.clientX - startX)}px`;
+      el.style.top = `${initialTop + (e.clientY - startY)}px`;
+    };
+    const onMouseUp = () => {
+      handle.style.cursor = "grab";
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      // Briefly keep the flag true to prevent the global mouseup listener from firing a new overlay
+      setTimeout(() => { isDraggingGlobal = false; }, 50);
+    };
+    handle.addEventListener("mousedown", onMouseDown);
+  }
 
   function mountOverlay(x: number, y: number, text: string) {
     if (!document.body) return;
@@ -72,6 +106,7 @@
     overlay.style.top  = `${y + window.scrollY + 8}px`;
     document.body.appendChild(overlay);
     requestTranslation(text);
+    makeDraggable(overlay, ".tmt-shimmer-header");
   }
 
   function showShimmer() {
@@ -106,7 +141,12 @@
           <button class="tmt-close">✕</button>
         </div>
         <p class="tmt-text">${escapeHtml(translation)}</p>
-        <div class="tmt-result-footer">
+        <div class="tmt-result-footer" style="gap: 8px;">
+          <button class="tmt-tts-btn" title="Listen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+            </svg>
+          </button>
           <button class="tmt-copy-btn" title="Copy translation">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
@@ -115,7 +155,40 @@
         </div>
       </div>
     `;
+
     overlay.querySelector(".tmt-close")?.addEventListener("click", removeOverlay);
+    
+    overlay.querySelector(".tmt-tts-btn")?.addEventListener("click", () => {
+      if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+      window.speechSynthesis.cancel();
+
+      const langMap: Record<string, string> = { "English": "en", "Nepali": "ne", "Tamang": "ne", "Hindi": "hi" };
+      const langCode = langMap[pageTargetLang] || "ne";
+
+      // Try local synthesis first
+      const voices = window.speechSynthesis.getVoices();
+      const preferredVoice = voices.find(v => v.lang.startsWith(langCode));
+
+      if (preferredVoice) {
+        const utterance = new SpeechSynthesisUtterance(translation);
+        utterance.lang = preferredVoice.lang;
+        utterance.voice = preferredVoice;
+        utterance.rate = 1.0;
+        window.speechSynthesis.speak(utterance);
+      } else {
+        // Fallback to Google TTS URL
+        const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${langCode}&client=tw-ob&q=${encodeURIComponent(translation)}`;
+        currentAudio = new Audio(url);
+        currentAudio.play().catch(() => {});
+      }
+
+      const ttsBtn = overlay?.querySelector(".tmt-tts-btn");
+      if (ttsBtn) {
+        ttsBtn.classList.add("tmt-playing");
+        setTimeout(() => ttsBtn.classList.remove("tmt-playing"), 2000);
+      }
+    });
+
     overlay.querySelector(".tmt-copy-btn")?.addEventListener("click", () => {
       navigator.clipboard.writeText(translation).catch(() => {});
       const btn = overlay?.querySelector(".tmt-copy-btn");
@@ -126,6 +199,8 @@
         }, 1500);
       }
     });
+
+    makeDraggable(overlay, ".tmt-result-header");
   }
 
   function showError(msg: string) {
@@ -140,6 +215,8 @@
   }
 
   function removeOverlay() {
+    if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+    window.speechSynthesis.cancel();
     overlay?.remove();
     overlay = null;
   }
@@ -211,50 +288,32 @@
   // ─── Status Pill ──────────────────────────────────────────────────────────
 
   function mountStatusPill() {
+    // No longer mounting on start as per user request to hide the loading bar
+  }
+
+  function updateStatusPill(_done: number, _total: number) {
+    // No longer updating progress visually
+  }
+
+  function completeStatusPill() {
     removeStatusPill();
     statusPill = document.createElement("div");
     statusPill.className = "tmt-status-pill";
     statusPill.innerHTML = safeHTML(`
-      <div class="tmt-progress-bg" style="width: 0%"></div>
-      <div class="tmt-status-icon"></div>
-      <div class="tmt-status-text">Translating… <span>0%</span></div>
-      <button class="tmt-restore-btn" style="display:none">
+      <div class="tmt-progress-bg" style="width: 100%; background: rgba(16, 185, 129, 0.1)"></div>
+      <div class="tmt-status-icon tmt-done">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <div class="tmt-status-text">Page translated ✓</div>
+      <button class="tmt-restore-btn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 105.64-11.36L1 10"/></svg>
         Restore
       </button>
     `) as any;
     document.body.appendChild(statusPill);
-  }
-
-  function updateStatusPill(done: number, total: number) {
-    if (!statusPill) return;
-    const percentage = total === 0 ? 100 : Math.min(100, Math.round((done / total) * 100));
-    const textEl = statusPill.querySelector(".tmt-status-text span");
-    const bgEl = statusPill.querySelector(".tmt-progress-bg") as HTMLElement;
-    if (textEl) textEl.textContent = `${percentage}%`;
-    if (bgEl) bgEl.style.width = `${percentage}%`;
-  }
-
-  function completeStatusPill() {
-    if (!statusPill) return;
-
-    const bgEl = statusPill.querySelector(".tmt-progress-bg") as HTMLElement;
-    if (bgEl) {
-      bgEl.style.width = "100%";
-      bgEl.style.background = "rgba(16, 185, 129, 0.1)";
-    }
-
-    const icon = statusPill.querySelector(".tmt-status-icon");
-    if (icon) {
-      icon.classList.add("tmt-done");
-      icon.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
-    }
-    const textEl = statusPill.querySelector(".tmt-status-text");
-    if (textEl) textEl.innerHTML = `Page translated ✓`;
 
     const restoreBtn = statusPill.querySelector(".tmt-restore-btn") as HTMLElement | null;
     if (restoreBtn) {
-      restoreBtn.style.display = "inline-flex";
       restoreBtn.addEventListener("click", () => {
         restorePage();
         removeStatusPill();
@@ -593,7 +652,7 @@
   // ─── DOM Event Listeners ──────────────────────────────────────────────────
 
   document.addEventListener("mouseup", (e) => {
-    if (!extensionEnabled) return;
+    if (!extensionEnabled || isDraggingGlobal) return;
     const sel = window.getSelection()?.toString().trim();
     if (!sel || sel.length < 2) { removeOverlay(); return; }
     if (overlay?.contains(e.target as Node)) return;

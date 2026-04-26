@@ -110,7 +110,7 @@
   padding: 8px 14px 10px;
 }
 
-.tmt-copy-btn {
+.tmt-copy-btn, .tmt-tts-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -124,12 +124,15 @@
   transition: all .15s;
   padding: 0;
 }
-.tmt-copy-btn:hover { background: #f3f4f6; color: #111827; }
+.tmt-copy-btn:hover, .tmt-tts-btn:hover { background: #f3f4f6; color: #111827; }
+.tmt-tts-btn.tmt-playing { color: #3b82f6; border-color: #3b82f6; background: rgba(59, 130, 246, 0.05); }
+
 @media (prefers-color-scheme: dark) {
-  .tmt-copy-btn { border-color: #2a2a2a; color: #9ca3af; }
-  .tmt-copy-btn:hover { background: #1a1a1a; border-color: #333; color: #ededed; }
+  .tmt-copy-btn, .tmt-tts-btn { border-color: #2a2a2a; color: #9ca3af; }
+  .tmt-copy-btn:hover, .tmt-tts-btn:hover { background: #1a1a1a; border-color: #333; color: #ededed; }
+  .tmt-tts-btn.tmt-playing { color: #60a5fa; border-color: #3b82f6; background: rgba(59, 130, 246, 0.1); }
 }
-.tmt-copy-btn svg { width: 14px; height: 14px; }
+.tmt-copy-btn svg, .tmt-tts-btn svg { width: 14px; height: 14px; }
 
 .tmt-shimmer-body {
   padding: 14px;
@@ -205,7 +208,7 @@
   top: 0;
   left: 0;
   height: 100%;
-  background: rgba(59, 130, 246, 0.08); /* Light blue fill */
+  background: rgba(99, 102, 241, 0.12); /* Soft Indigo fill */
   transition: width 0.3s ease, background-color 0.3s ease;
   z-index: 0;
   pointer-events: none;
@@ -218,7 +221,7 @@
     box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
   }
   .tmt-progress-bg {
-    background: rgba(59, 130, 246, 0.15);
+    background: rgba(99, 102, 241, 0.2);
   }
 }
 

@@ -25,7 +25,7 @@ export default function App() {
   const [showPrivacyWarning, setShowPrivacyWarning] = useState(false);
   const { history, add, remove, clear, importHistory } = useHistory();
 
-  const [sourceLang, setSourceLang] = useState<Language>("English");
+  const [sourceLang, setSourceLang] = useState<Language>("Auto");
   const [targetLang, setTargetLang] = useState<Language>("Nepali");
   const [enabled, setEnabled] = useState(true);
   const [revisitedText, setRevisitedText] = useState("");
