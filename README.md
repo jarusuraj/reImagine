@@ -59,7 +59,7 @@ Whether you want to translate a single word, an entire webpage, or dictate text 
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) v18 or higher
-- Google Chrome (or any Chromium-based browser)
+- Google Chrome (or any Chromium-based browser does not work with ,Voice Feature doesnot work with brave)
 - A running instance of the TMT Translation API
 
 ### Installation
