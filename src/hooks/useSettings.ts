@@ -1,8 +1,5 @@
-// Settings hook retained for future extension-level preferences.
-// API credentials are now build-time only (configured in .env).
-// No user-editable API config is exposed in the UI.
-
+// Reserved for future user preferences (e.g. default language pair, auto-translate on select).
+// API credentials are build-time only — configured in .env, never exposed in UI.
 export function useSettings() {
-  // Reserved for non-sensitive user preferences (e.g. default language).
   return {};
 }

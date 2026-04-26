@@ -8,7 +8,6 @@
 
 - [Overview](#-overview)
 - [Features](#-features)
-- [Screenshots](#-screenshots)
 - [Tech Stack](#-tech-stack)
 - [Getting Started](#-getting-started)
 - [Usage Guide](#-usage-guide)

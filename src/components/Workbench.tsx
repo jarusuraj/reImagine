@@ -356,7 +356,7 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
                   });
                 });
               } else if (!response || response.error) {
-                const msg = response?.error || "comming soon";
+                const msg = response?.error || "Could not start voice recognition.";
                 setDictateError(msg);
                 setListening(false);
                 chrome.storage.session.remove("tmt_speech_active");
@@ -416,7 +416,7 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
         if (event.error === "not-allowed") {
           setDictateError("Microphone blocked. Allow mic access in your browser settings.");
         } else if (event.error === "network") {
-          setDictateError("comming soon");
+          setDictateError("Network error. Please check your internet connection.");
         } else if (event.error === "no-speech") {
           setDictateError("No speech detected. Please try again and speak clearly.");
         } else {

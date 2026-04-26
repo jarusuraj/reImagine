@@ -2,31 +2,48 @@ import { useState, useEffect } from "react";
 
 export type Theme = "light" | "dark" | "system";
 
-/**
- * Hook to manage application color theme (light/dark/system).
- * Persists user preference to localStorage and updates document root class.
- */
+const THEME_KEY = "tmt-theme";
+
+function chromeStorageAvailable(): boolean {
+  return typeof chrome !== "undefined" && !!chrome.storage?.local;
+}
+
+function applyTheme(isDark: boolean) {
+  if (isDark) {
+    document.documentElement.classList.add("dark");
+  } else {
+    document.documentElement.classList.remove("dark");
+  }
+}
+
 export function useTheme() {
-  const [theme, setTheme] = useState<Theme>(() => {
-    return (localStorage.getItem("tmt-theme") as Theme) || "dark";
-  });
+  const [theme, setThemeState] = useState<Theme>("dark");
 
+  // Load persisted theme on mount
   useEffect(() => {
-    localStorage.setItem("tmt-theme", theme);
-    const root = document.documentElement;
+    if (chromeStorageAvailable()) {
+      chrome.storage.local.get([THEME_KEY], (res) => {
+        const saved = res[THEME_KEY] as Theme | undefined;
+        if (saved) setThemeState(saved);
+      });
+    } else {
+      // Fallback for local dev
+      const saved = localStorage.getItem(THEME_KEY) as Theme | null;
+      if (saved) setThemeState(saved);
+    }
+  }, []);
 
-    const applyTheme = (isDark: boolean) => {
-      if (isDark) {
-        root.classList.add("dark");
-      } else {
-        root.classList.remove("dark");
-      }
-    };
+  // Apply and persist whenever theme changes
+  useEffect(() => {
+    if (chromeStorageAvailable()) {
+      chrome.storage.local.set({ [THEME_KEY]: theme });
+    } else {
+      localStorage.setItem(THEME_KEY, theme);
+    }
 
     if (theme === "system") {
       const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
       applyTheme(mediaQuery.matches);
-
       const listener = (e: MediaQueryListEvent) => applyTheme(e.matches);
       mediaQuery.addEventListener("change", listener);
       return () => mediaQuery.removeEventListener("change", listener);
@@ -35,12 +52,10 @@ export function useTheme() {
     }
   }, [theme]);
 
+  const setTheme = (t: Theme) => setThemeState(t);
+
   const toggleTheme = () => {
-    if (theme === "system" || theme === "light") {
-      setTheme("dark");
-    } else {
-      setTheme("light");
-    }
+    setThemeState((prev) => (prev === "light" ? "dark" : "light"));
   };
 
   return { theme, setTheme, toggleTheme };

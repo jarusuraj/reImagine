@@ -1,22 +1,46 @@
 (() => {
   "use strict";
-  if ((window as any).tmt_injected) return;
-  (window as any).tmt_injected = true;
+
+  // Clean up any old UI elements if this is a re-injection after an extension reload
+  document.getElementById("tmt-overlay")?.remove();
+  document.getElementById("tmt-page-prompt")?.remove();
+  document.querySelector(".tmt-status-pill")?.remove();
+  
+  const oldObs = document.body ? (document.body as any)._tmtObserver as IntersectionObserver | undefined : undefined;
+  if (oldObs) {
+    oldObs.disconnect();
+    delete (document.body as any)._tmtObserver;
+  }
 
   let overlay: HTMLDivElement | null = null;
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let activeRecognition: any = null;
   let micTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
-  const MIC_TIMEOUT_MS = 60_000; // Auto-stop mic after 60 seconds
-  
+  const MIC_TIMEOUT_MS = 60_000;
+
+  // Trusted Types policy for strict CSP sites (e.g. GitHub)
+  let ttPolicy: any;
+  if (typeof (window as any).trustedTypes !== "undefined" && (window as any).trustedTypes.createPolicy) {
+    try {
+      ttPolicy = (window as any).trustedTypes.createPolicy("tmt-policy", {
+        createHTML: (s: string) => s
+      });
+    } catch (e) {
+      console.warn("TMT: Failed to create TrustedTypes policy", e);
+    }
+  }
+
+  function safeHTML(html: string): string {
+    return ttPolicy ? ttPolicy.createHTML(html) : html;
+  }
+
   let pageSourceLang = "English";
   let pageTargetLang = "Nepali";
   let extensionEnabled = true;
 
-  if (typeof chrome !== 'undefined' && chrome.storage) {
+  if (typeof chrome !== "undefined" && chrome.storage) {
     chrome.storage.local.get(["extensionEnabled"], (res) => {
       if (res.extensionEnabled !== undefined) extensionEnabled = Boolean(res.extensionEnabled);
-      
       if (document.readyState === "complete" || document.readyState === "interactive") {
         checkLanguagePrompt();
       } else {
@@ -30,25 +54,23 @@
         if (!extensionEnabled) {
           removeOverlay();
           removeStatusPill();
-          const pagePrompt = document.getElementById("tmt-page-prompt");
-          if (pagePrompt) pagePrompt.remove();
+          document.getElementById("tmt-page-prompt")?.remove();
         }
       }
     });
   }
 
-  function mountOverlay(x: number, y: number, text: string) {
-    removeOverlay();
+  // ─── Selection Overlay ────────────────────────────────────────────────────
 
+  function mountOverlay(x: number, y: number, text: string) {
+    if (!document.body) return;
+    removeOverlay();
     overlay = document.createElement("div");
     overlay.id = "tmt-overlay";
-
     showShimmer();
-
     overlay.style.left = `${x + window.scrollX + 8}px`;
     overlay.style.top  = `${y + window.scrollY + 8}px`;
     document.body.appendChild(overlay);
-
     requestTranslation(text);
   }
 
@@ -73,6 +95,7 @@
   function showResult(translation: string, detectedLang?: string) {
     if (!overlay) return;
     const langLabel = detectedLang ?? "Auto";
+    // escapeHtml() is used for all user-derived / API-derived content injected via innerHTML
     overlay.innerHTML = `
       <div class="tmt-result">
         <div class="tmt-result-header">
@@ -107,12 +130,12 @@
 
   function showError(msg: string) {
     if (!overlay) return;
-    overlay.innerHTML = `
+    overlay.innerHTML = safeHTML(`
       <div class="tmt-error-card">
         <div class="tmt-error-icon">⚠</div>
         <div class="tmt-error-text">${escapeHtml(msg)}</div>
       </div>
-    `;
+    `) as any;
     setTimeout(removeOverlay, 4000);
   }
 
@@ -121,6 +144,8 @@
     overlay = null;
   }
 
+  // Security: all user/API content injected into innerHTML is passed through escapeHtml().
+  // nodeValue assignments in translateNode() are inherently safe and do NOT use innerHTML.
   function escapeHtml(str: string): string {
     const div = document.createElement("div");
     div.textContent = str;
@@ -128,11 +153,11 @@
   }
 
   function requestTranslation(text: string) {
-    chrome.runtime.sendMessage({ 
-      action: "tmt_translate_quick", 
+    chrome.runtime.sendMessage({
+      action: "tmt_translate_quick",
       text,
       sourceLang: pageSourceLang,
-      targetLang: pageTargetLang 
+      targetLang: pageTargetLang,
     }, (res) => {
       if (chrome.runtime.lastError) return showError("Extension error");
       if (res?.translation) showResult(res.translation);
@@ -140,29 +165,42 @@
     });
   }
 
+  // ─── Page Translation State ───────────────────────────────────────────────
+
   const originalValues = new WeakMap<Text, string>();
-  const translatedNodes = new WeakSet<Text>();
-  let lazyObserver: IntersectionObserver | null = null;
-  let pageActive  = false;
+  let translatedNodes = new WeakSet<Text>();
+  let pageActive = false;
   let statusPill: HTMLDivElement | null = null;
   let nodesDone = 0;
   let totalNodes = 0;
 
+  /**
+   * Collects all translatable text nodes from a DOM subtree.
+   *
+   * Skips:
+   *   - Tag-level: SCRIPT, STYLE, NOSCRIPT, TEXTAREA, INPUT, SELECT, CODE, PRE
+   *   - contenteditable elements — modifying them would corrupt user-editable areas
+   *   - Whitespace-only / single-character text nodes
+   */
   function collectTextNodes(root: Element): Text[] {
-    const skip = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEXTAREA", "INPUT", "SELECT", "CODE", "PRE"]);
+    const skipTags = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEXTAREA", "INPUT", "SELECT", "CODE", "PRE"]);
     const nodes: Text[] = [];
 
     const walk = (node: Node) => {
-      if (node.nodeType === Node.ELEMENT_NODE && skip.has((node as Element).tagName)) return;
-      
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const el = node as Element;
+        if (skipTags.has(el.tagName)) return;
+        // Skip contenteditable — translating these would corrupt user-editable content
+        if (el.getAttribute("contenteditable") !== null) return;
+      }
+
       if (node.nodeType === Node.TEXT_NODE) {
         const val = node.nodeValue || "";
-        if (val.trim().length > 1) {
-          nodes.push(node as Text);
-        }
+        // Skip whitespace-only and single-char nodes — they produce empty API calls
+        if (val.trim().length > 1) nodes.push(node as Text);
         return;
       }
-      
+
       node.childNodes.forEach(walk);
     };
 
@@ -170,11 +208,13 @@
     return nodes;
   }
 
+  // ─── Status Pill ──────────────────────────────────────────────────────────
+
   function mountStatusPill() {
     removeStatusPill();
     statusPill = document.createElement("div");
     statusPill.className = "tmt-status-pill";
-    statusPill.innerHTML = `
+    statusPill.innerHTML = safeHTML(`
       <div class="tmt-progress-bg" style="width: 0%"></div>
       <div class="tmt-status-icon"></div>
       <div class="tmt-status-text">Translating… <span>0%</span></div>
@@ -182,7 +222,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 105.64-11.36L1 10"/></svg>
         Restore
       </button>
-    `;
+    `) as any;
     document.body.appendChild(statusPill);
   }
 
@@ -191,14 +231,13 @@
     const percentage = total === 0 ? 100 : Math.min(100, Math.round((done / total) * 100));
     const textEl = statusPill.querySelector(".tmt-status-text span");
     const bgEl = statusPill.querySelector(".tmt-progress-bg") as HTMLElement;
-    
     if (textEl) textEl.textContent = `${percentage}%`;
     if (bgEl) bgEl.style.width = `${percentage}%`;
   }
 
   function completeStatusPill() {
     if (!statusPill) return;
-    
+
     const bgEl = statusPill.querySelector(".tmt-progress-bg") as HTMLElement;
     if (bgEl) {
       bgEl.style.width = "100%";
@@ -223,9 +262,7 @@
     }
 
     setTimeout(() => {
-      if (statusPill && !statusPill.matches(":hover")) {
-        dismissStatusPill();
-      }
+      if (statusPill && !statusPill.matches(":hover")) dismissStatusPill();
     }, 8000);
   }
 
@@ -242,11 +279,14 @@
     totalNodes = 0;
   }
 
-  async function translateNode(node: Text) {
+  // ─── Node Translation ─────────────────────────────────────────────────────
+
+  async function translateNode(node: Text, retries = 2): Promise<void> {
     if (translatedNodes.has(node) || !pageActive) return;
-    
+
     const val = node.nodeValue || "";
     const orig = val.trim();
+
     if (!orig) {
       translatedNodes.add(node);
       nodesDone++;
@@ -254,103 +294,239 @@
       return;
     }
 
-    if (!originalValues.has(node)) {
-      originalValues.set(node, val);
-    }
+    if (!originalValues.has(node)) originalValues.set(node, val);
 
     return new Promise<void>((resolve) => {
-      chrome.runtime.sendMessage({ 
-        action: "tmt_translate_quick", 
-        text: orig,
-        sourceLang: pageSourceLang,
-        targetLang: pageTargetLang
-      }, (res) => {
-        if (!chrome.runtime.lastError && res?.translation && pageActive) {
-          const prefix = val.match(/^\s*/)?.[0] || "";
-          const suffix = val.match(/\s*$/)?.[0] || "";
-          node.nodeValue = prefix + res.translation + suffix;
-          translatedNodes.add(node);
+      const attempt = () => {
+        try {
+          chrome.runtime.sendMessage({
+            action: "tmt_translate_quick",
+            text: orig,
+            sourceLang: pageSourceLang,
+            targetLang: pageTargetLang,
+          }, (res) => {
+            if (chrome.runtime.lastError) {
+              // Service worker was terminated and restarted. Retry — the new SW instance
+              // will handle the message. After retries are exhausted, skip the node.
+              if (retries > 0 && pageActive) {
+                setTimeout(() => translateNode(node, retries - 1).then(resolve), 700);
+              } else {
+                nodesDone++;
+                updateStatusPill(nodesDone, totalNodes);
+                if (nodesDone >= totalNodes) completeStatusPill();
+                resolve();
+              }
+              return;
+            }
+
+            if (res?.translation && pageActive) {
+              const prefix = val.match(/^\s*/)?.[0] || "";
+              const suffix = val.match(/\s*$/)?.[0] || "";
+              node.nodeValue = prefix + res.translation + suffix;
+              translatedNodes.add(node);
+            }
+            nodesDone++;
+            updateStatusPill(nodesDone, totalNodes);
+            if (nodesDone >= totalNodes) completeStatusPill();
+            resolve();
+          });
+        } catch (e) {
+          // If extension context is invalidated (extension was reloaded), this throws synchronously.
+          // The old script should just quietly die.
+          pageActive = false;
+          resolve();
         }
-        nodesDone++;
-        updateStatusPill(nodesDone, totalNodes);
-        if (nodesDone >= totalNodes) completeStatusPill();
-        resolve();
-      });
+      };
+      attempt();
     });
   }
 
+  // ─── Page Translation Orchestration ──────────────────────────────────────
 
-
+  /**
+   * Translates the entire page using a hybrid strategy:
+   *
+   *   Phase 1 — Immediate: translate all nodes currently in the viewport synchronously.
+   *   This fixes the IntersectionObserver miss on above-the-fold content.
+   *
+   *   Phase 2 — Lazy: observe remaining below-the-fold nodes with IntersectionObserver.
+   *   Nodes enter the viewport as the user scrolls and are translated on demand.
+   *
+   * Both phases use batches of 5 with a 150ms gap between batches to avoid
+   * rate-limiting on content-heavy pages.
+   */
   async function translatePage() {
-    if (pageActive) return;
+    if (pageActive || !document.body) return;
     pageActive = true;
-    
-    const pagePrompt = document.getElementById("tmt-page-prompt");
-    if (pagePrompt) {
-      pagePrompt.classList.add("tmt-prompt-out");
-      setTimeout(() => pagePrompt.remove(), 300);
-    }
+    let keepAlive: number | undefined;
+    let observer: IntersectionObserver | undefined;
 
-    const nodes = collectTextNodes(document.body);
-    totalNodes = nodes.length;
-    nodesDone = 0;
+    try {
+      const pagePrompt = document.getElementById("tmt-page-prompt");
+      if (pagePrompt) {
+        pagePrompt.classList.add("tmt-prompt-out");
+        setTimeout(() => pagePrompt.remove(), 300);
+      }
 
-    mountStatusPill();
-    updateStatusPill(0, totalNodes);
+      document.body.setAttribute("data-tmt-active", "true");
+      const allNodes = collectTextNodes(document.body);
+      totalNodes = allNodes.length;
+      nodesDone = 0;
+      mountStatusPill();
+      updateStatusPill(0, totalNodes);
 
-    // IntersectionObserver to translate nodes as they scroll into view
-    // We observe the parent elements because Text nodes aren't observable
-    lazyObserver = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          const element = entry.target as HTMLElement;
-          const elementNodes = collectTextNodes(element);
-          elementNodes.forEach(node => translateNode(node));
-          lazyObserver?.unobserve(element);
+      if (allNodes.length === 0) {
+        completeStatusPill();
+        return;
+      }
+
+      // Ping the service worker every 25s to prevent MV3 idle termination.
+      keepAlive = setInterval(() => {
+        try {
+          chrome.runtime.sendMessage({ action: "tmt_keepalive" }).catch(() => {});
+        } catch (e) {
+          // If the extension context is invalidated (e.g. extension was reloaded), 
+          // this throws synchronously. We just clear the interval.
+          clearInterval(keepAlive);
         }
-      });
-    }, {
-      rootMargin: "300px 0px", // Translate content before it actually appears (1-2 screen heights ahead)
-      threshold: 0.01
-    });
+      }, 25_000) as unknown as number;
 
-    // Observe all elements that contain text
-    const parents = new Set<HTMLElement>();
-    nodes.forEach(node => {
-      if (node.parentElement) parents.add(node.parentElement);
-    });
-    
-    parents.forEach(p => lazyObserver?.observe(p));
+      // Partition nodes: in-viewport (immediate) vs below-the-fold (lazy)
+      const viewportNodes: Text[] = [];
+      const lazyNodes: Text[] = [];
+
+      for (const node of allNodes) {
+        const rect = node.parentElement?.getBoundingClientRect();
+        if (rect && rect.top < window.innerHeight + 300 && rect.bottom > -300) {
+          viewportNodes.push(node);
+        } else {
+          lazyNodes.push(node);
+        }
+      }
+
+      // Phase 1: translate above-the-fold nodes immediately in batches of 5
+      const BATCH_SIZE = 5;
+      const BATCH_DELAY_MS = 150;
+
+      for (let i = 0; i < viewportNodes.length; i += BATCH_SIZE) {
+        if (!pageActive) { clearInterval(keepAlive); return; }
+        const batch = viewportNodes.slice(i, i + BATCH_SIZE);
+        await Promise.all(batch.map(n => translateNode(n)));
+        if (i + BATCH_SIZE < viewportNodes.length) {
+          await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
+        }
+      }
+
+      // Phase 2: lazily translate below-the-fold nodes as user scrolls
+      if (lazyNodes.length === 0) {
+        clearInterval(keepAlive);
+        if (pageActive) completeStatusPill();
+        return;
+      }
+
+      // Group lazy nodes by parent element
+      const parentMap = new Map<HTMLElement, Text[]>();
+      for (const node of lazyNodes) {
+        if (!node.parentElement) continue;
+        const existing = parentMap.get(node.parentElement) ?? [];
+        existing.push(node);
+        parentMap.set(node.parentElement, existing);
+      }
+
+      // Buffer pending elements to process in rate-limited batches
+      let pendingElements: HTMLElement[] = [];
+      let lazyTimer: ReturnType<typeof setTimeout> | null = null;
+
+      const flushPending = async () => {
+        if (!pageActive) return;
+        const toProcess = pendingElements.splice(0);
+        const batchNodes = toProcess.flatMap(el => parentMap.get(el) ?? []);
+        for (let i = 0; i < batchNodes.length; i += BATCH_SIZE) {
+          if (!pageActive) { clearInterval(keepAlive); return; }
+          await Promise.all(batchNodes.slice(i, i + BATCH_SIZE).map(n => translateNode(n)));
+          if (i + BATCH_SIZE < batchNodes.length) {
+            await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
+          }
+        }
+      };
+
+      observer = new IntersectionObserver((entries) => {
+        let hasNew = false;
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            observer?.unobserve(entry.target);
+            pendingElements.push(entry.target as HTMLElement);
+            hasNew = true;
+          }
+        });
+        if (hasNew) {
+          if (lazyTimer) clearTimeout(lazyTimer);
+          // Small debounce to batch multiple simultaneously visible entries
+          lazyTimer = setTimeout(() => { flushPending(); }, 100);
+        }
+      }, { rootMargin: "300px 0px", threshold: 0.01 });
+
+      parentMap.forEach((_, el) => observer?.observe(el));
+
+      // Store observer reference on the body so restorePage() can clean it up
+      (document.body as any)._tmtObserver = observer;
+
+    } catch (err) {
+      console.error("translatePage error:", err);
+      pageActive = false;
+      document.body.removeAttribute("data-tmt-active");
+      if (keepAlive) clearInterval(keepAlive);
+      if (observer) observer.disconnect();
+      
+      // Update the status pill to show the error
+      if (!statusPill) mountStatusPill();
+      const statusText = document.querySelector('.tmt-status-text');
+      if (statusText) statusText.textContent = `Translation stopped: ${err instanceof Error ? err.message : 'Unknown error'}`;
+    }
   }
 
   function restorePage() {
-    if (lazyObserver) {
-      lazyObserver.disconnect();
-      lazyObserver = null;
+    pageActive = false;
+    document.body.removeAttribute("data-tmt-active");
+
+    // Clean up lazy observer if it exists
+    const obs = (document.body as any)._tmtObserver as IntersectionObserver | undefined;
+    if (obs) {
+      obs.disconnect();
+      delete (document.body as any)._tmtObserver;
     }
+
     const allTextNodes = collectTextNodes(document.body);
     allTextNodes.forEach((node) => {
       if (originalValues.has(node)) {
         node.nodeValue = originalValues.get(node) || "";
       }
     });
-    pageActive = false;
+
+    // Reset so the page can be re-translated in the same session
+    translatedNodes = new WeakSet<Text>();
   }
+
+  // ─── Auto Language Prompt ─────────────────────────────────────────────────
 
   function checkLanguagePrompt() {
     if (!extensionEnabled) return;
 
-    // Give dynamic pages a moment to finish rendering before we check the script
     setTimeout(() => {
       const sampleText = document.body?.innerText?.substring(0, 3000) || "";
       if (sampleText.trim().length < 50) return;
 
-      // Look for Devanagari characters to see if this is likely Nepali or Tamang content
       const devanagariChars = (sampleText.match(/[\u0900-\u097F]/g) || []).length;
-      
+
       let detectedLangCode = "en";
       if (devanagariChars > 20) {
-        detectedLangCode = "ne";
+        const tamangMarkers = [
+          "मुबा", "ताबा", "लासो", "नबा", "ह्या", "खिम", "गिबा", "ब्रोबा", "क्यु", "सुङ्बा",
+          "च्यु", "मेवा", "खई", "ह्याम्बो", "निसा", "सेबा", "पापा", "आमा", "अाङा",
+          "ङा", "छ्यो", "ख्याप", "ङारो", "ग्याम", "सेम", "खे",
+        ];
+        const isTamang = tamangMarkers.some(m => sampleText.includes(m));
+        detectedLangCode = isTamang ? "tmg" : "ne";
       }
 
       const domainKey = `tmt_dismissed_${window.location.hostname}`;
@@ -363,26 +539,26 @@
   }
 
   function showPagePrompt(langCode: string) {
-    if (document.getElementById("tmt-page-prompt") || pageActive) return;
-    
+    if (!document.body || document.getElementById("tmt-page-prompt") || pageActive) return;
+
     let displayLang = "English";
     let autoSource = "English";
     let autoTarget = "Nepali";
 
-    if (langCode.startsWith("ne")) {
-       displayLang = "Nepali";
-       autoSource = "Nepali";
-       autoTarget = "English";
-    }
-    if (langCode.startsWith("ta")) {
-       displayLang = "Tamang";
-       autoSource = "Tamang";
-       autoTarget = "English";
+    if (langCode === "ne") {
+      displayLang = "Nepali";
+      autoSource = "Nepali";
+      autoTarget = "English";
+    } else if (langCode === "tmg") {
+      displayLang = "Tamang";
+      autoSource = "Tamang";
+      autoTarget = "English";
     }
 
     const prompt = document.createElement("div");
     prompt.id = "tmt-page-prompt";
-    prompt.innerHTML = `
+    // Static HTML template — no user/API data interpolated, so innerHTML is safe here
+    prompt.innerHTML = safeHTML(`
       <div class="tmt-prompt-content">
         <div class="tmt-prompt-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
@@ -396,7 +572,7 @@
            <button class="tmt-prompt-btn" id="tmt-prompt-no">✕</button>
         </div>
       </div>
-    `;
+    `) as any;
     document.body.appendChild(prompt);
 
     prompt.querySelector("#tmt-prompt-yes")?.addEventListener("click", () => {
@@ -414,6 +590,8 @@
     });
   }
 
+  // ─── DOM Event Listeners ──────────────────────────────────────────────────
+
   document.addEventListener("mouseup", (e) => {
     if (!extensionEnabled) return;
     const sel = window.getSelection()?.toString().trim();
@@ -425,9 +603,7 @@
     const my = e.clientY;
     debounceTimer = setTimeout(() => {
       const currentSel = window.getSelection()?.toString().trim();
-      if (currentSel && currentSel.length >= 2) {
-        mountOverlay(mx, my, currentSel);
-      }
+      if (currentSel && currentSel.length >= 2) mountOverlay(mx, my, currentSel);
     }, 600);
   });
 
@@ -441,18 +617,23 @@
     removeOverlay();
   }, { passive: true });
 
+  // ─── Extension Message Handler ────────────────────────────────────────────
+
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-    // Only accept messages from this extension's own popup/background
+    // Security: reject messages from any origin other than this extension
     if (sender.id !== chrome.runtime.id) return;
 
     if (!extensionEnabled && msg.action !== "tmt_get_page_status") return;
+
     if (msg.action === "tmt_page_translate") {
       pageSourceLang = msg.sourceLang || "English";
       pageTargetLang = msg.targetLang || "Nepali";
+      sendResponse({ ok: true });
       translatePage();
     } else if (msg.action === "tmt_page_restore") {
       restorePage();
       removeStatusPill();
+      sendResponse({ ok: true });
     } else if (msg.action === "tmt_get_page_status") {
       sendResponse({ pageActive });
     } else if (msg.action === "tmt_context_translate") {
@@ -464,10 +645,8 @@
     } else if (msg.action === "tmt_start_speech") {
       const SR = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
       if (!SR) { sendResponse({ error: "Speech recognition is not supported in this browser." }); return; }
-      
-      if (activeRecognition) {
-        try { activeRecognition.stop(); } catch (e) {}
-      }
+
+      if (activeRecognition) { try { activeRecognition.stop(); } catch (_) {} }
       if (micTimeoutTimer) { clearTimeout(micTimeoutTimer); micTimeoutTimer = null; }
 
       activeRecognition = new SR();
@@ -476,38 +655,32 @@
       activeRecognition.continuous = true;
       activeRecognition.maxAlternatives = 1;
 
-      // Auto-stop microphone after 60 seconds to prevent indefinite recording
       micTimeoutTimer = setTimeout(() => {
-        if (activeRecognition) {
-          try { activeRecognition.stop(); } catch (e) {}
-        }
+        if (activeRecognition) { try { activeRecognition.stop(); } catch (_) {} }
         chrome.runtime.sendMessage({ action: "tmt_speech_error", error: "mic-timeout" }).catch(() => {});
       }, MIC_TIMEOUT_MS);
-      
+
       activeRecognition.onresult = (e: any) => {
         let finalTranscript = "";
         let interimTranscript = "";
         for (let i = e.resultIndex; i < e.results.length; ++i) {
-          if (e.results[i].isFinal) {
-            finalTranscript += e.results[i][0].transcript;
-          } else {
-            interimTranscript += e.results[i][0].transcript;
-          }
+          if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript;
+          else interimTranscript += e.results[i][0].transcript;
         }
         chrome.runtime.sendMessage({ action: "tmt_speech_result", finalTranscript, interimTranscript }).catch(() => {});
       };
-      
+
       activeRecognition.onerror = (e: any) => {
         if (micTimeoutTimer) { clearTimeout(micTimeoutTimer); micTimeoutTimer = null; }
         chrome.runtime.sendMessage({ action: "tmt_speech_error", error: e.error }).catch(() => {});
       };
-      
+
       activeRecognition.onend = () => {
         if (micTimeoutTimer) { clearTimeout(micTimeoutTimer); micTimeoutTimer = null; }
         chrome.runtime.sendMessage({ action: "tmt_speech_end" }).catch(() => {});
         activeRecognition = null;
       };
-      
+
       try {
         activeRecognition.start();
         sendResponse({ started: true });
@@ -519,9 +692,7 @@
     } else if (msg.action === "tmt_stop_speech") {
       if (micTimeoutTimer) { clearTimeout(micTimeoutTimer); micTimeoutTimer = null; }
       if (activeRecognition) {
-        try {
-          activeRecognition.stop();
-        } catch (e) {}
+        try { activeRecognition.stop(); } catch (_) {}
         activeRecognition = null;
       }
       sendResponse({ stopped: true });

@@ -57,7 +57,7 @@ export default function App() {
         }
         chrome.scripting.executeScript({
           target: { tabId: id },
-          func: () => document.querySelectorAll("[data-tmt-original]").length > 0,
+          func: () => document.body.hasAttribute("data-tmt-active"),
         }).then((results) => {
           if (results?.[0]?.result) setPageTranslated(true);
         }).catch(() => {});
@@ -68,8 +68,33 @@ export default function App() {
   const sendToTab = (payload: Record<string, unknown>) => {
     if (typeof chrome === "undefined" || !chrome.tabs) return;
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const id = tabs[0]?.id;
-      if (id) chrome.tabs.sendMessage(id, payload).catch(() => {});
+      const tab = tabs[0];
+      const id = tab?.id;
+      const url = tab?.url || "";
+
+      // Only works on real http/https pages — not chrome:// or edge:// system pages
+      if (!id || !url.startsWith("http")) return;
+
+      chrome.tabs.sendMessage(id, payload, (_res) => {
+        const err = chrome.runtime.lastError?.message ?? "";
+        // Only re-inject if the content script is genuinely absent.
+        // "message port closed" is harmless (listener responded without sendResponse).
+        if (!err || !err.includes("Receiving end does not exist")) return;
+
+        // Content script not present (tab was open before extension install/reload).
+        // Inject it on demand, then retry once.
+        if (!chrome.scripting) return;
+        chrome.scripting.executeScript(
+          { target: { tabId: id }, files: ["content.js"] },
+          () => {
+            if (chrome.runtime.lastError) return; // Page blocked scripting — give up
+            // Give the IIFE a moment to initialize before sending the message
+            setTimeout(() => {
+              chrome.tabs.sendMessage(id, payload).catch(() => {});
+            }, 300);
+          }
+        );
+      });
     });
   };
 

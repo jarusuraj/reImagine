@@ -17,9 +17,16 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   }).catch(() => {});
 });
 
+// Security: reject all messages not from this extension's own pages/scripts
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
-  // Only accept messages from this extension's own pages and content scripts
   if (sender.id !== chrome.runtime.id) return;
+
+  // Keepalive ping from content.ts during long page translations.
+  // MV3 service workers terminate after ~30s idle — this prevents mid-translation death.
+  if (msg.action === "tmt_keepalive") {
+    reply({ alive: true });
+    return true;
+  }
 
   if (msg.action === "tmt_translate_quick") {
     handleQuickTranslate(msg.text, msg.sourceLang, msg.targetLang).then(reply);
@@ -52,23 +59,21 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   }
 });
 
-// In-memory cache to speed up repetitive translations and reduce API load
 const translationCache = new Map<string, string>();
 
-// Concurrency control: Browser limits to 6 connections per domain. 
-// We manage our own queue of 5 to keep one slot open for the UI/other tasks.
-const queue: (() => Promise<void>)[] = [];
+const queue: Array<() => Promise<void>> = [];
 let activeRequests = 0;
 const MAX_CONCURRENT = 5;
 
-async function processQueue() {
-  if (activeRequests >= MAX_CONCURRENT || queue.length === 0) return;
-  const task = queue.shift();
-  if (task) {
+function processQueue(): void {
+  while (activeRequests < MAX_CONCURRENT && queue.length > 0) {
+    const task = queue.shift();
+    if (!task) break;
     activeRequests++;
-    await task();
-    activeRequests--;
-    processQueue();
+    task().finally(() => {
+      activeRequests--;
+      processQueue();
+    });
   }
 }
 
@@ -76,8 +81,9 @@ async function handleQuickTranslate(
   text: string,
   sourceLang: Language = "English",
   targetLang: Language = "Nepali",
-  retries = 2
 ): Promise<{ translation?: string; error?: string }> {
+  if (!text?.trim()) return { translation: "" };
+
   const cacheKey = `${sourceLang}:${targetLang}:${text}`;
   if (translationCache.has(cacheKey)) {
     return { translation: translationCache.get(cacheKey) };
@@ -85,20 +91,28 @@ async function handleQuickTranslate(
 
   return new Promise((resolve) => {
     const task = async () => {
-      try {
-        const res = await translate(text, sourceLang, targetLang);
-        if (res.translation) {
-          translationCache.set(cacheKey, res.translation);
-        }
-        resolve({ translation: res.translation });
-      } catch (error: any) {
-        // Retry logic for transient errors (like 503 or 429)
-        if (retries > 0 && (error.message.includes("overwhelmed") || error.message.includes("Slow down"))) {
-          await new Promise(r => setTimeout(r, 500)); // Wait 500ms before retry
-          const retryRes = await handleQuickTranslate(text, sourceLang, targetLang, retries - 1);
-          resolve(retryRes);
-        } else {
-          resolve({ error: error.message || "Translation failed" });
+      let retries = 2;
+      while (true) {
+        try {
+          const res = await translate(text, sourceLang, targetLang);
+          if (res.translation) translationCache.set(cacheKey, res.translation);
+          resolve({ translation: res.translation });
+          return;
+        } catch (error: any) {
+          const msg: string = error.message || "";
+          const isTransient =
+            msg.includes("overwhelmed") ||
+            msg.includes("Slow down") ||
+            msg.includes("Too Many Requests");
+
+          if (retries > 0 && isTransient) {
+            const delay = 500 * (3 - retries);
+            await new Promise(r => setTimeout(r, delay));
+            retries--;
+          } else {
+            resolve({ error: msg || "Translation failed" });
+            return;
+          }
         }
       }
     };
