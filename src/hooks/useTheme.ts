@@ -17,7 +17,7 @@ function applyTheme(isDark: boolean) {
 }
 
 export function useTheme() {
-  const [theme, setThemeState] = useState<Theme>("dark");
+  const [theme, setThemeState] = useState<Theme>("light");
 
   // Load persisted theme on mount
   useEffect(() => {

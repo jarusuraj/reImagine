@@ -138,7 +138,7 @@ export default function App() {
   };
 
   return (
-    <div className="h-[540px] w-[420px] bg-[#fafafa] dark:bg-[#000000] text-zinc-900 dark:text-zinc-100 flex flex-col relative overflow-hidden transition-colors duration-500">
+    <div className="h-[540px] w-[420px] bg-white dark:bg-[#000000] text-zinc-900 dark:text-zinc-100 flex flex-col relative overflow-hidden transition-colors duration-500">
       <Header
         onHistory={() => setHistoryOpen(!historyOpen)}
         historyOpen={historyOpen}

@@ -22,7 +22,7 @@ body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f8fafc;
+  background-color: #ffffff;
   color: #0f172a;
   overflow: hidden;
   transition: background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1),
