@@ -1,0 +1,88 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Root-level theme transition — buttery smooth day/night switch */
+html {
+  transition: background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  background-color: #e5e5e5;
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+  width: 420px;
+  height: 540px;
+}
+
+body {
+  margin: 0 auto;
+  width: 420px;
+  height: 540px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #ffffff;
+  color: #0f172a;
+  overflow: hidden;
+  transition: background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+html.dark body {
+  background-color: #0a0a0a;
+  color: #f1f5f9;
+  box-shadow: 0 0 50px rgba(0,0,0,0.8);
+}
+
+html.dark {
+  background-color: #111111;
+}
+
+/* Smooth transitions on ALL themed elements */
+header, main, footer, aside, div, button, input, textarea, p, span, h1, h2, h3 {
+  transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              color 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { 
+  background: #cbd5e1; 
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; background-clip: content-box; }
+
+html.dark ::-webkit-scrollbar-thumb { background: #333; background-clip: content-box; }
+html.dark ::-webkit-scrollbar-thumb:hover { background: #444; background-clip: content-box; }
+
+/* Removed hiding scrollbars to ensure accessibility */
+textarea {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+html.dark textarea {
+  scrollbar-color: #333 transparent;
+}
+
+.font-mono { font-family: 'JetBrains Mono', monospace; }
+
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+
+.shimmer {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 400px 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+html.dark .shimmer {
+  background: linear-gradient(90deg, #141414 25%, #1f1f1f 50%, #141414 75%);
+  background-size: 400px 100%;
+}
