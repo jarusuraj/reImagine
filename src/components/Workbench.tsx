@@ -46,20 +46,20 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
     if (typeof chrome === "undefined" || !chrome.storage) return;
 
     
-    chrome.storage.session.get(["tmt_speech_pending", "tmt_speech_active"], (res) => {
-      if (res.tmt_speech_active) {
+    chrome.storage.session.get(["reImagine_speech_pending", "reImagine_speech_active"], (res) => {
+      if (res.reImagine_speech_active) {
         setListening(true);
       }
-      processSpeechPayload(res.tmt_speech_pending);
+      processSpeechPayload(res.reImagine_speech_pending);
     });
 
     
     const msgListener = (msg: any) => {
-      if (msg.action === "tmt_speech_result") {
+      if (msg.action === "reImagine_speech_result") {
         processSpeechPayload({ status: "result", finalTranscript: msg.finalTranscript, interimTranscript: msg.interimTranscript });
-      } else if (msg.action === "tmt_speech_error") {
+      } else if (msg.action === "reImagine_speech_error") {
         processSpeechPayload({ status: "error", error: msg.error });
-      } else if (msg.action === "tmt_speech_end") {
+      } else if (msg.action === "reImagine_speech_end") {
         processSpeechPayload({ status: "end" });
       }
     };
@@ -68,7 +68,7 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
     
     const storageListener = (changes: any, area: string) => {
       if (area !== "session") return;
-      if (changes.tmt_speech_active && !changes.tmt_speech_active.newValue) {
+      if (changes.reImagine_speech_active && !changes.reImagine_speech_active.newValue) {
         setListening(false);
       }
     };
@@ -112,7 +112,7 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
 
   function processSpeechPayload(payload: any) {
     if (!payload) return;
-    chrome.storage.session.remove(["tmt_speech_pending"]);
+    chrome.storage.session.remove(["reImagine_speech_pending"]);
     if (payload.status === "result") {
       if (payload.finalTranscript) {
         existingTextRef.current = existingTextRef.current ? existingTextRef.current + " " + payload.finalTranscript : payload.finalTranscript;
@@ -135,10 +135,10 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
         setDictateError("Speech error: " + payload.error);
       }
       setListening(false);
-      chrome.storage.session.remove("tmt_speech_active");
+      chrome.storage.session.remove("reImagine_speech_active");
     } else if (payload.status === "end") {
       setListening(false);
-      chrome.storage.session.remove("tmt_speech_active");
+      chrome.storage.session.remove("reImagine_speech_active");
     }
   }
 
@@ -333,7 +333,7 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
       if (typeof chrome !== "undefined" && chrome.tabs) {
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
           if (tabs[0]?.id) {
-            chrome.tabs.sendMessage(tabs[0].id, { action: "tmt_stop_speech" });
+            chrome.tabs.sendMessage(tabs[0].id, { action: "reImagine_stop_speech" });
           }
         });
       }
@@ -344,7 +344,7 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
       setListening(false);
       setInterimText("");
       if (typeof chrome !== "undefined" && chrome.storage) {
-        chrome.storage.session.remove("tmt_speech_active");
+        chrome.storage.session.remove("reImagine_speech_active");
       }
       return;
     }
@@ -355,7 +355,7 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
       existingTextRef.current = sourceText;
       
       
-      chrome.storage.session.set({ tmt_speech_active: true });
+      chrome.storage.session.set({ reImagine_speech_active: true });
       
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         const tab = tabs[0];
@@ -365,14 +365,14 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
         if (url.startsWith("chrome://") || url.startsWith("edge://") || url.startsWith("about:") || !url.startsWith("http")) {
           setDictateError("Voice dictation only works on regular websites (HTTPS). Please try on a real webpage.");
           setListening(false);
-          chrome.storage.session.remove("tmt_speech_active");
+          chrome.storage.session.remove("reImagine_speech_active");
           return;
         }
 
         if (id) {
           const sendSpeechMsg = () => {
             chrome.tabs.sendMessage(id, { 
-              action: "tmt_start_speech", 
+              action: "reImagine_start_speech", 
               lang: LANG_MAP[sourceLang] || "en-US" 
             }, (response) => {
               if (chrome.runtime.lastError) {
@@ -384,18 +384,18 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
                   if (chrome.runtime.lastError) {
                     setDictateError("Cannot start voice on this page. Please refresh the page manually.");
                     setListening(false);
-                    chrome.storage.session.remove("tmt_speech_active");
+                    chrome.storage.session.remove("reImagine_speech_active");
                     return;
                   }
                   
                   chrome.tabs.sendMessage(id, { 
-                    action: "tmt_start_speech", 
+                    action: "reImagine_start_speech", 
                     lang: LANG_MAP[sourceLang] || "en-US" 
                   }, (retryRes) => {
                     if (chrome.runtime.lastError || (!retryRes || retryRes.error)) {
                       setDictateError(chrome.runtime.lastError ? "Failed to start. Refresh page." : (retryRes?.error || "Error"));
                       setListening(false);
-                      chrome.storage.session.remove("tmt_speech_active");
+                      chrome.storage.session.remove("reImagine_speech_active");
                     }
                   });
                 });
@@ -403,7 +403,7 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
                 const msg = response?.error || "Could not start voice recognition.";
                 setDictateError(msg);
                 setListening(false);
-                chrome.storage.session.remove("tmt_speech_active");
+                chrome.storage.session.remove("reImagine_speech_active");
               }
             });
           };
@@ -411,7 +411,7 @@ export function Workbench({ enabled, onResult, sourceLang, targetLang, onSourceL
         } else {
           setDictateError("No active tab found to process speech.");
           setListening(false);
-          chrome.storage.session.remove("tmt_speech_active");
+          chrome.storage.session.remove("reImagine_speech_active");
         }
       });
       return;

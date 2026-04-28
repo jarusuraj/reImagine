@@ -1,11 +1,11 @@
 import { LANG_CODE } from "@/constants/languages";
 import type { Language, TranslationResult } from "@/types";
 
-const TMT_URL = import.meta.env.TMT_API_URL as string;
-const TMT_KEY = import.meta.env.TMT_API_KEY as string;
+const reImagine_URL = import.meta.env.REIMAGINE_API_URL as string;
+const reImagine_KEY = import.meta.env.REIMAGINE_API_KEY as string;
 const SENTENCE_TIMEOUT_MS = 15_000;
 
-interface TMTResponse {
+interface reImagineResponse {
   message_type: "SUCCESS" | "FAIL";
   message?: string;
   src_lang?: string;
@@ -54,11 +54,11 @@ async function translateSingleSentence(
 
   if (srcCode === tgtCode) return text;
 
-  const response = await fetch(TMT_URL, {
+  const response = await fetch(reImagine_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${TMT_KEY}`,
+      "Authorization": `Bearer ${reImagine_KEY}`,
     },
     body: JSON.stringify({ text, src_lang: srcCode, tgt_lang: tgtCode }),
     signal,
@@ -72,7 +72,7 @@ async function translateSingleSentence(
     throw new Error(body.message || `Server returned HTTP ${response.status}`);
   }
 
-  const data = await response.json() as TMTResponse;
+  const data = await response.json() as reImagineResponse;
 
   
   if (data.message_type === "FAIL") {
@@ -90,7 +90,7 @@ export async function translate(
   const sanitizedText = text.trim();
 
   if (!sanitizedText) throw new Error("Please enter text to translate.");
-  if (!TMT_URL || !TMT_KEY) throw new Error("TMT API is not configured. Check your credentials.");
+  if (!reImagine_URL || !reImagine_KEY) throw new Error("reImagine API is not configured. Check your credentials.");
 
   
   const actualSourceLang: Language =

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { HistoryEntry, TranslationResult } from "@/types";
 
-const STORAGE_KEY = "tmt_history_v1";
+const STORAGE_KEY = "reImagine_history_v1";
 const MAX_ENTRIES = 50;
 
 function chromeStorageAvailable(): boolean {

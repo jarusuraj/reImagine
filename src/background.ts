@@ -3,16 +3,16 @@ import type { Language } from "./types";
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
-    id: "tmt-translate",
+    id: "reImagine-translate",
     title: "Translate with reImagine",
     contexts: ["selection"],
   });
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId !== "tmt-translate" || !info.selectionText || !tab?.id) return;
+  if (info.menuItemId !== "reImagine-translate" || !info.selectionText || !tab?.id) return;
   chrome.tabs.sendMessage(tab.id, {
-    action: "tmt_context_translate",
+    action: "reImagine_context_translate",
     text: info.selectionText,
   }).catch(() => {});
 });
@@ -23,19 +23,19 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
 
   
   
-  if (msg.action === "tmt_keepalive") {
+  if (msg.action === "reImagine_keepalive") {
     reply({ alive: true });
     return true;
   }
 
-  if (msg.action === "tmt_translate_quick") {
+  if (msg.action === "reImagine_translate_quick") {
     handleQuickTranslate(msg.text, msg.sourceLang, msg.targetLang).then(reply);
     return true;
   }
 
-  if (msg.action === "tmt_speech_result") {
+  if (msg.action === "reImagine_speech_result") {
     chrome.storage.session.set({
-      tmt_speech_pending: {
+      reImagine_speech_pending: {
         status: "result",
         finalTranscript: msg.finalTranscript,
         interimTranscript: msg.interimTranscript,
@@ -43,16 +43,16 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     });
     return;
   }
-  if (msg.action === "tmt_speech_error") {
-    chrome.storage.session.set({ tmt_speech_pending: { status: "error", error: msg.error } });
-    chrome.storage.session.remove("tmt_speech_active");
+  if (msg.action === "reImagine_speech_error") {
+    chrome.storage.session.set({ reImagine_speech_pending: { status: "error", error: msg.error } });
+    chrome.storage.session.remove("reImagine_speech_active");
     return;
   }
-  if (msg.action === "tmt_speech_end") {
-    chrome.storage.session.remove("tmt_speech_active");
-    chrome.storage.session.get("tmt_speech_pending", (res) => {
-      if (!res.tmt_speech_pending) {
-        chrome.storage.session.set({ tmt_speech_pending: { status: "end" } });
+  if (msg.action === "reImagine_speech_end") {
+    chrome.storage.session.remove("reImagine_speech_active");
+    chrome.storage.session.get("reImagine_speech_pending", (res) => {
+      if (!res.reImagine_speech_pending) {
+        chrome.storage.session.set({ reImagine_speech_pending: { status: "end" } });
       }
     });
     return;

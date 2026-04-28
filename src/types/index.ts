@@ -13,7 +13,7 @@ export interface HistoryEntry extends TranslationResult {
 }
 
 export interface Settings {
-  tmtApiUrl: string;
-  tmtApiKey: string;
+  reImagineApiUrl: string;
+  reImagineApiKey: string;
 }
 // TypeScript interfaces and types used throughout the application.

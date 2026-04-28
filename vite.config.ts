@@ -15,8 +15,8 @@ export default defineConfig(({ mode }) => {
     },
 
     define: {
-      "import.meta.env.TMT_API_URL":    JSON.stringify(env.TMT_API_URL    ?? ""),
-      "import.meta.env.TMT_API_KEY":    JSON.stringify(env.TMT_API_KEY    ?? ""),
+      "import.meta.env.REIMAGINE_API_URL":    JSON.stringify(env.REIMAGINE_API_URL    ?? ""),
+      "import.meta.env.REIMAGINE_API_KEY":    JSON.stringify(env.REIMAGINE_API_KEY    ?? ""),
 
       
       "import.meta.env.APP_TITLE":    JSON.stringify(env.APP_TITLE    ?? "reImagine"),
@@ -47,8 +47,8 @@ export default defineConfig(({ mode }) => {
     test: {
       environment: "jsdom",
       env: {
-        TMT_API_URL: env.TMT_API_URL,
-        TMT_API_KEY: env.TMT_API_KEY
+        REIMAGINE_API_URL: env.REIMAGINE_API_URL,
+        REIMAGINE_API_KEY: env.REIMAGINE_API_KEY
       }
     }
   };

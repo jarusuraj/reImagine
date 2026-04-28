@@ -52,14 +52,14 @@ export default function App() {
       const id = tabs[0]?.id;
       if (!id) return;
 
-      chrome.tabs.sendMessage(id, { action: "tmt_get_page_status" }, (res) => {
+      chrome.tabs.sendMessage(id, { action: "reImagine_get_page_status" }, (res) => {
         if (!chrome.runtime.lastError && res?.pageActive) {
           setPageTranslated(true);
           return;
         }
         chrome.scripting.executeScript({
           target: { tabId: id },
-          func: () => document.body.hasAttribute("data-tmt-active"),
+          func: () => document.body.hasAttribute("data-reImagine-active"),
         }).then((results) => {
           if (results?.[0]?.result) setPageTranslated(true);
         }).catch(() => {});
@@ -98,13 +98,13 @@ export default function App() {
 
   const handlePageTranslate = () => {
     if (typeof chrome === "undefined" || !chrome.storage) {
-      sendToTab({ action: "tmt_page_translate", sourceLang, targetLang });
+      sendToTab({ action: "reImagine_page_translate", sourceLang, targetLang });
       setPageTranslated(true);
       return;
     }
-    chrome.storage.local.get(["tmt_privacy_ack"], (res) => {
-      if (res.tmt_privacy_ack) {
-        sendToTab({ action: "tmt_page_translate", sourceLang, targetLang });
+    chrome.storage.local.get(["reImagine_privacy_ack"], (res) => {
+      if (res.reImagine_privacy_ack) {
+        sendToTab({ action: "reImagine_page_translate", sourceLang, targetLang });
         setPageTranslated(true);
       } else {
         setShowPrivacyWarning(true);
@@ -114,15 +114,15 @@ export default function App() {
 
   const confirmPageTranslate = () => {
     if (typeof chrome !== "undefined" && chrome.storage) {
-      chrome.storage.local.set({ tmt_privacy_ack: true });
+      chrome.storage.local.set({ reImagine_privacy_ack: true });
     }
     setShowPrivacyWarning(false);
-    sendToTab({ action: "tmt_page_translate", sourceLang, targetLang });
+    sendToTab({ action: "reImagine_page_translate", sourceLang, targetLang });
     setPageTranslated(true);
   };
 
   const handlePageRestore = () => {
-    sendToTab({ action: "tmt_page_restore" });
+    sendToTab({ action: "reImagine_page_restore" });
     setPageTranslated(false);
   };
 

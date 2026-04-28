@@ -2,14 +2,14 @@
   "use strict";
 
   
-  document.getElementById("tmt-overlay")?.remove();
-  document.getElementById("tmt-page-prompt")?.remove();
-  document.querySelector(".tmt-status-pill")?.remove();
+  document.getElementById("reImagine-overlay")?.remove();
+  document.getElementById("reImagine-page-prompt")?.remove();
+  document.querySelector(".reImagine-status-pill")?.remove();
   
-  const oldObs = document.body ? (document.body as any)._tmtObserver as IntersectionObserver | undefined : undefined;
+  const oldObs = document.body ? (document.body as any)._reImagineObserver as IntersectionObserver | undefined : undefined;
   if (oldObs) {
     oldObs.disconnect();
-    delete (document.body as any)._tmtObserver;
+    delete (document.body as any)._reImagineObserver;
   }
 
   let overlay: HTMLDivElement | null = null;
@@ -24,11 +24,11 @@
   let ttPolicy: any;
   if (typeof (window as any).trustedTypes !== "undefined" && (window as any).trustedTypes.createPolicy) {
     try {
-      ttPolicy = (window as any).trustedTypes.createPolicy("tmt-policy", {
+      ttPolicy = (window as any).trustedTypes.createPolicy("reImagine-policy", {
         createHTML: (s: string) => s
       });
     } catch (e) {
-      console.warn("TMT: Failed to create TrustedTypes policy", e);
+      console.warn("reImagine: Failed to create TrustedTypes policy", e);
     }
   }
 
@@ -56,7 +56,7 @@
         if (!extensionEnabled) {
           removeOverlay();
           removeStatusPill();
-          document.getElementById("tmt-page-prompt")?.remove();
+          document.getElementById("reImagine-page-prompt")?.remove();
         }
       }
     });
@@ -102,31 +102,31 @@
     
     removeOverlay();
     overlay = document.createElement("div");
-    overlay.id = "tmt-overlay";
+    overlay.id = "reImagine-overlay";
     showShimmer();
     overlay.style.left = `${x + window.scrollX + 8}px`;
     overlay.style.top  = `${y + window.scrollY + 8}px`;
     document.body.appendChild(overlay);
     requestTranslation(text);
-    makeDraggable(overlay, ".tmt-shimmer-header");
+    makeDraggable(overlay, ".reImagine-shimmer-header");
   }
 
   function showShimmer() {
     if (!overlay) return;
     overlay.innerHTML = `
-      <div class="tmt-shimmer-card">
-        <div class="tmt-shimmer-header">
-          <span class="tmt-badge">TMT</span>
-          <button class="tmt-close">✕</button>
+      <div class="reImagine-shimmer-card">
+        <div class="reImagine-shimmer-header">
+          <span class="reImagine-badge">reImagine</span>
+          <button class="reImagine-close">✕</button>
         </div>
-        <div class="tmt-shimmer-body">
-          <div class="tmt-shimmer" style="width:85%"></div>
-          <div class="tmt-shimmer" style="width:60%"></div>
-          <div class="tmt-shimmer" style="width:72%"></div>
+        <div class="reImagine-shimmer-body">
+          <div class="reImagine-shimmer" style="width:85%"></div>
+          <div class="reImagine-shimmer" style="width:60%"></div>
+          <div class="reImagine-shimmer" style="width:72%"></div>
         </div>
       </div>
     `;
-    overlay.querySelector(".tmt-close")?.addEventListener("click", removeOverlay);
+    overlay.querySelector(".reImagine-close")?.addEventListener("click", removeOverlay);
   }
 
   function showResult(translation: string, detectedLang?: string) {
@@ -134,17 +134,17 @@
     const langLabel = detectedLang ?? "Auto";
     
     overlay.innerHTML = `
-      <div class="tmt-result">
-        <div class="tmt-result-header">
+      <div class="reImagine-result">
+        <div class="reImagine-result-header">
           <div style="display:flex;align-items:center">
-            <span class="tmt-badge">reImagine</span>
-            <span class="tmt-source-label">${escapeHtml(langLabel)}</span>
+            <span class="reImagine-badge">reImagine</span>
+            <span class="reImagine-source-label">${escapeHtml(langLabel)}</span>
           </div>
-          <button class="tmt-close">✕</button>
+          <button class="reImagine-close">✕</button>
         </div>
-        <p class="tmt-text">${escapeHtml(translation)}</p>
-        <div class="tmt-result-footer" style="gap: 8px;">
-          <button class="tmt-copy-btn" title="Copy translation">
+        <p class="reImagine-text">${escapeHtml(translation)}</p>
+        <div class="reImagine-result-footer" style="gap: 8px;">
+          <button class="reImagine-copy-btn" title="Copy translation">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
             </svg>
@@ -153,11 +153,11 @@
       </div>
     `;
 
-    overlay.querySelector(".tmt-close")?.addEventListener("click", removeOverlay);
+    overlay.querySelector(".reImagine-close")?.addEventListener("click", removeOverlay);
 
-    overlay.querySelector(".tmt-copy-btn")?.addEventListener("click", () => {
+    overlay.querySelector(".reImagine-copy-btn")?.addEventListener("click", () => {
       navigator.clipboard.writeText(translation).catch(() => {});
-      const btn = overlay?.querySelector(".tmt-copy-btn");
+      const btn = overlay?.querySelector(".reImagine-copy-btn");
       if (btn) {
         btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
         setTimeout(() => {
@@ -166,15 +166,15 @@
       }
     });
 
-    makeDraggable(overlay, ".tmt-result-header");
+    makeDraggable(overlay, ".reImagine-result-header");
   }
 
   function showError(msg: string) {
     if (!overlay) return;
     overlay.innerHTML = safeHTML(`
-      <div class="tmt-error-card">
-        <div class="tmt-error-icon">⚠</div>
-        <div class="tmt-error-text">${escapeHtml(msg)}</div>
+      <div class="reImagine-error-card">
+        <div class="reImagine-error-icon">⚠</div>
+        <div class="reImagine-error-text">${escapeHtml(msg)}</div>
       </div>
     `) as any;
     setTimeout(removeOverlay, 4000);
@@ -183,7 +183,7 @@
   function removeOverlay() {
     if (currentAudio) { currentAudio.pause(); currentAudio = null; }
     window.speechSynthesis.cancel();
-    document.getElementById("tmt-overlay")?.remove();
+    document.getElementById("reImagine-overlay")?.remove();
     overlay = null;
   }
 
@@ -195,7 +195,7 @@
 
   function requestTranslation(text: string) {
     chrome.runtime.sendMessage({
-      action: "tmt_translate_quick",
+      action: "reImagine_translate_quick",
       text,
       sourceLang: pageSourceLang,
       targetLang: pageTargetLang,
@@ -252,21 +252,21 @@
   function completeStatusPill() {
     removeStatusPill();
     statusPill = document.createElement("div");
-    statusPill.className = "tmt-status-pill";
+    statusPill.className = "reImagine-status-pill";
     statusPill.innerHTML = safeHTML(`
-      <div class="tmt-progress-bg" style="width: 100%; background: rgba(16, 185, 129, 0.1)"></div>
-      <div class="tmt-status-icon tmt-done">
+      <div class="reImagine-progress-bg" style="width: 100%; background: rgba(16, 185, 129, 0.1)"></div>
+      <div class="reImagine-status-icon reImagine-done">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
       </div>
-      <div class="tmt-status-text">Page translated ✓</div>
-      <button class="tmt-restore-btn">
+      <div class="reImagine-status-text">Page translated ✓</div>
+      <button class="reImagine-restore-btn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 105.64-11.36L1 10"/></svg>
         Restore
       </button>
     `) as any;
     document.body.appendChild(statusPill);
 
-    const restoreBtn = statusPill.querySelector(".tmt-restore-btn") as HTMLElement | null;
+    const restoreBtn = statusPill.querySelector(".reImagine-restore-btn") as HTMLElement | null;
     if (restoreBtn) {
       restoreBtn.addEventListener("click", () => {
         restorePage();
@@ -281,7 +281,7 @@
 
   function dismissStatusPill() {
     if (!statusPill) return;
-    statusPill.classList.add("tmt-pill-out");
+    statusPill.classList.add("reImagine-pill-out");
     setTimeout(removeStatusPill, 250);
   }
 
@@ -312,7 +312,7 @@
       const attempt = () => {
         try {
           chrome.runtime.sendMessage({
-            action: "tmt_translate_quick",
+            action: "reImagine_translate_quick",
             text: orig,
             sourceLang: pageSourceLang,
             targetLang: pageTargetLang,
@@ -359,13 +359,13 @@
     let observer: IntersectionObserver | undefined;
 
     try {
-      const pagePrompt = document.getElementById("tmt-page-prompt");
+      const pagePrompt = document.getElementById("reImagine-page-prompt");
       if (pagePrompt) {
-        pagePrompt.classList.add("tmt-prompt-out");
+        pagePrompt.classList.add("reImagine-prompt-out");
         setTimeout(() => pagePrompt.remove(), 300);
       }
 
-      document.body.setAttribute("data-tmt-active", "true");
+      document.body.setAttribute("data-reImagine-active", "true");
       const allNodes = collectTextNodes(document.body);
       totalNodes = allNodes.length;
       nodesDone = 0;
@@ -380,7 +380,7 @@
       
       keepAlive = setInterval(() => {
         try {
-          chrome.runtime.sendMessage({ action: "tmt_keepalive" }).catch(() => {});
+          chrome.runtime.sendMessage({ action: "reImagine_keepalive" }).catch(() => {});
         } catch (e) {
           clearInterval(keepAlive);
         }
@@ -463,31 +463,31 @@
 
       parentMap.forEach((_, el) => observer?.observe(el));
 
-      (document.body as any)._tmtObserver = observer;
+      (document.body as any)._reImagineObserver = observer;
 
     } catch (err) {
       console.error("translatePage error:", err);
       pageActive = false;
-      document.body.removeAttribute("data-tmt-active");
+      document.body.removeAttribute("data-reImagine-active");
       if (keepAlive) clearInterval(keepAlive);
       if (observer) observer.disconnect();
       
       
       if (!statusPill) mountStatusPill();
-      const statusText = document.querySelector('.tmt-status-text');
+      const statusText = document.querySelector('.reImagine-status-text');
       if (statusText) statusText.textContent = `Translation stopped: ${err instanceof Error ? err.message : 'Unknown error'}`;
     }
   }
 
   function restorePage() {
     pageActive = false;
-    document.body.removeAttribute("data-tmt-active");
+    document.body.removeAttribute("data-reImagine-active");
 
     
-    const obs = (document.body as any)._tmtObserver as IntersectionObserver | undefined;
+    const obs = (document.body as any)._reImagineObserver as IntersectionObserver | undefined;
     if (obs) {
       obs.disconnect();
-      delete (document.body as any)._tmtObserver;
+      delete (document.body as any)._reImagineObserver;
     }
 
     const allTextNodes = collectTextNodes(document.body);
@@ -522,10 +522,10 @@
         detectedLangCode = isTamang ? "tmg" : "ne";
       }
 
-      const domainKey = `tmt_dismissed_${window.location.hostname}`;
+      const domainKey = `reImagine_dismissed_${window.location.hostname}`;
       chrome.storage.local.get([domainKey, "hasManuallyTranslated"], (res) => {
         
-        if (res.hasManuallyTranslated && !res[domainKey] && !sessionStorage.getItem("tmt_prompt_session_dismissed")) {
+        if (res.hasManuallyTranslated && !res[domainKey] && !sessionStorage.getItem("reImagine_prompt_session_dismissed")) {
           showPagePrompt(detectedLangCode);
         }
       });
@@ -533,7 +533,7 @@
   }
 
   function showPagePrompt(langCode: string) {
-    if (!document.body || document.getElementById("tmt-page-prompt") || pageActive) return;
+    if (!document.body || document.getElementById("reImagine-page-prompt") || pageActive) return;
 
     let displayLang = "English";
     let autoSource = "English";
@@ -550,36 +550,36 @@
     }
 
     const prompt = document.createElement("div");
-    prompt.id = "tmt-page-prompt";
+    prompt.id = "reImagine-page-prompt";
     
     prompt.innerHTML = safeHTML(`
-      <div class="tmt-prompt-content">
-        <div class="tmt-prompt-icon">
+      <div class="reImagine-prompt-content">
+        <div class="reImagine-prompt-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
         </div>
-        <div class="tmt-prompt-text">
-          <span class="tmt-prompt-title">reImagine: Translate Page?</span>
-          <span class="tmt-prompt-desc">This page is in ${displayLang}. Translate to ${autoTarget}?</span>
+        <div class="reImagine-prompt-text">
+          <span class="reImagine-prompt-title">reImagine: Translate Page?</span>
+          <span class="reImagine-prompt-desc">This page is in ${displayLang}. Translate to ${autoTarget}?</span>
         </div>
-        <div class="tmt-prompt-actions">
-           <button class="tmt-prompt-btn tmt-prompt-btn-primary" id="tmt-prompt-yes">Translate</button>
-           <button class="tmt-prompt-btn" id="tmt-prompt-no">✕</button>
+        <div class="reImagine-prompt-actions">
+           <button class="reImagine-prompt-btn reImagine-prompt-btn-primary" id="reImagine-prompt-yes">Translate</button>
+           <button class="reImagine-prompt-btn" id="reImagine-prompt-no">✕</button>
         </div>
       </div>
     `) as any;
     document.body.appendChild(prompt);
 
-    prompt.querySelector("#tmt-prompt-yes")?.addEventListener("click", () => {
+    prompt.querySelector("#reImagine-prompt-yes")?.addEventListener("click", () => {
       pageSourceLang = autoSource;
       pageTargetLang = autoTarget;
       translatePage();
     });
 
-    prompt.querySelector("#tmt-prompt-no")?.addEventListener("click", () => {
-      const domainKey = `tmt_dismissed_${window.location.hostname}`;
+    prompt.querySelector("#reImagine-prompt-no")?.addEventListener("click", () => {
+      const domainKey = `reImagine_dismissed_${window.location.hostname}`;
       chrome.storage.local.set({ [domainKey]: true });
-      sessionStorage.setItem("tmt_prompt_session_dismissed", "true");
-      prompt.classList.add("tmt-prompt-out");
+      sessionStorage.setItem("reImagine_prompt_session_dismissed", "true");
+      prompt.classList.add("reImagine-prompt-out");
       setTimeout(() => prompt.remove(), 300);
     });
   }
@@ -588,7 +588,7 @@
   document.addEventListener("mouseup", (e) => {
     if (!extensionEnabled || isDraggingGlobal) return;
     
-    if (document.getElementById("tmt-overlay")) return;
+    if (document.getElementById("reImagine-overlay")) return;
 
     const sel = window.getSelection()?.toString().trim();
     if (!sel || sel.length < 2) return;
@@ -617,28 +617,28 @@
     
     if (sender.id !== chrome.runtime.id) return;
 
-    if (!extensionEnabled && msg.action !== "tmt_get_page_status") return;
+    if (!extensionEnabled && msg.action !== "reImagine_get_page_status") return;
 
-    if (msg.action === "tmt_page_translate") {
+    if (msg.action === "reImagine_page_translate") {
       chrome.storage.local.set({ hasManuallyTranslated: true });
       pageSourceLang = msg.sourceLang || "English";
       pageTargetLang = msg.targetLang || "Nepali";
       sendResponse({ ok: true });
       translatePage();
-    } else if (msg.action === "tmt_page_restore") {
+    } else if (msg.action === "reImagine_page_restore") {
       restorePage();
       removeStatusPill();
       sendResponse({ ok: true });
-    } else if (msg.action === "tmt_get_page_status") {
+    } else if (msg.action === "reImagine_get_page_status") {
       sendResponse({ pageActive });
-    } else if (msg.action === "tmt_context_translate") {
-      if (document.getElementById("tmt-overlay")) return;
+    } else if (msg.action === "reImagine_context_translate") {
+      if (document.getElementById("reImagine-overlay")) return;
       const sel = window.getSelection();
       if (sel && sel.rangeCount > 0) {
         const rect = sel.getRangeAt(0).getBoundingClientRect();
         mountOverlay(rect.left, rect.bottom, msg.text);
       }
-    } else if (msg.action === "tmt_start_speech") {
+    } else if (msg.action === "reImagine_start_speech") {
       const SR = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
       if (!SR) { sendResponse({ error: "Speech recognition is not supported in this browser." }); return; }
 
@@ -653,7 +653,7 @@
 
       micTimeoutTimer = setTimeout(() => {
         if (activeRecognition) { try { activeRecognition.stop(); } catch (_) {} }
-        chrome.runtime.sendMessage({ action: "tmt_speech_error", error: "mic-timeout" }).catch(() => {});
+        chrome.runtime.sendMessage({ action: "reImagine_speech_error", error: "mic-timeout" }).catch(() => {});
       }, MIC_TIMEOUT_MS);
 
       activeRecognition.onresult = (e: any) => {
@@ -663,17 +663,17 @@
           if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript;
           else interimTranscript += e.results[i][0].transcript;
         }
-        chrome.runtime.sendMessage({ action: "tmt_speech_result", finalTranscript, interimTranscript }).catch(() => {});
+        chrome.runtime.sendMessage({ action: "reImagine_speech_result", finalTranscript, interimTranscript }).catch(() => {});
       };
 
       activeRecognition.onerror = (e: any) => {
         if (micTimeoutTimer) { clearTimeout(micTimeoutTimer); micTimeoutTimer = null; }
-        chrome.runtime.sendMessage({ action: "tmt_speech_error", error: e.error }).catch(() => {});
+        chrome.runtime.sendMessage({ action: "reImagine_speech_error", error: e.error }).catch(() => {});
       };
 
       activeRecognition.onend = () => {
         if (micTimeoutTimer) { clearTimeout(micTimeoutTimer); micTimeoutTimer = null; }
-        chrome.runtime.sendMessage({ action: "tmt_speech_end" }).catch(() => {});
+        chrome.runtime.sendMessage({ action: "reImagine_speech_end" }).catch(() => {});
         activeRecognition = null;
       };
 
@@ -685,7 +685,7 @@
         activeRecognition = null;
       }
       return true;
-    } else if (msg.action === "tmt_stop_speech") {
+    } else if (msg.action === "reImagine_stop_speech") {
       if (micTimeoutTimer) { clearTimeout(micTimeoutTimer); micTimeoutTimer = null; }
       if (activeRecognition) {
         try { activeRecognition.stop(); } catch (_) {}

@@ -3,8 +3,8 @@ import { translate } from "./translation";
 
 vi.stubGlobal("import.meta", {
   env: {
-    TMT_API_URL: process.env.TMT_API_URL,
-    TMT_API_KEY: process.env.TMT_API_KEY
+    REIMAGINE_API_URL: process.env.REIMAGINE_API_URL,
+    REIMAGINE_API_KEY: process.env.REIMAGINE_API_KEY
   }
 });
 
@@ -69,7 +69,7 @@ describe("Translation Service (Unit Test)", () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it("should handle TMT failure messages properly", async () => {
+  it("should handle reImagine failure messages properly", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({

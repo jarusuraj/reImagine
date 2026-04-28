@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 
 export type Theme = "light" | "dark" | "system";
 
-const THEME_KEY = "tmt-theme";
+const THEME_KEY = "reImagine-theme";
 
 function chromeStorageAvailable(): boolean {
   return typeof chrome !== "undefined" && !!chrome.storage?.local;
