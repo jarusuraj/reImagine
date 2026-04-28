@@ -468,3 +468,17 @@
     color: #000;
   }
 }
+
+/* ── Global Interactive Cursors ── */
+#tmt-overlay button,
+#tmt-overlay [role="button"],
+#tmt-page-prompt button,
+.tmt-status-pill button,
+.tmt-restore-btn {
+  cursor: pointer !important;
+}
+
+.tmt-text,
+.tmt-status-text {
+  cursor: text;
+}
