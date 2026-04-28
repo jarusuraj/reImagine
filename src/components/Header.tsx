@@ -86,3 +86,4 @@ export function Header({ onHistory, historyOpen, enabled, toggleEnabled }: Props
     </header>
   );
 }
+// UI component for the popup header, containing history and toggle controls.

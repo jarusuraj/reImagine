@@ -1,4 +1,3 @@
-/// <reference types="vite/client" />
 
 interface ImportMetaEnv {
   readonly TMT_API_URL:    string;
@@ -11,3 +10,4 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+// TypeScript environment definitions for Vite.

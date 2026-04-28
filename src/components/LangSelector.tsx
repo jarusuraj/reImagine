@@ -38,3 +38,4 @@ export function LangSelector({ value, onChange, idPrefix }: Props) {
     </div>
   );
 }
+// UI component for selecting source and target languages.

@@ -11,7 +11,7 @@ function chromeStorageAvailable(): boolean {
 export function useHistory() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
-  // Load on mount
+  
   useEffect(() => {
     if (chromeStorageAvailable()) {
       chrome.storage.local.get([STORAGE_KEY], (res) => {
@@ -20,13 +20,13 @@ export function useHistory() {
         }
       });
     } else {
-      // Local dev vane fallback use gara
+      
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) setHistory(JSON.parse(raw));
     }
   }, []);
 
-  // Persist on every change
+  
   useEffect(() => {
     if (chromeStorageAvailable()) {
       chrome.storage.local.set({ [STORAGE_KEY]: history });
@@ -49,7 +49,7 @@ export function useHistory() {
   }, []);
 
   const clear = useCallback(() => {
-    // Saph gar
+    
     setHistory([]);
     if (chromeStorageAvailable()) {
       chrome.storage.local.remove(STORAGE_KEY);
@@ -68,3 +68,4 @@ export function useHistory() {
 
   return { history, add, remove, clear, importHistory };
 }
+// Custom hook for managing translation history in local storage.

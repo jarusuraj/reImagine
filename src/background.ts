@@ -17,12 +17,12 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   }).catch(() => {});
 });
 
-// Security: reject all messages not from this extension's own pages/scripts
+
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (sender.id !== chrome.runtime.id) return;
 
-  // Keepalive ping from content.ts during long page translations.
-  // MV3 service workers terminate after ~30s idle — this prevents mid-translation death.
+  
+  
   if (msg.action === "tmt_keepalive") {
     reply({ alive: true });
     return true;
@@ -120,3 +120,4 @@ async function handleQuickTranslate(
     processQueue();
   });
 }
+// Service worker handling context menus, message routing, translation queuing, and speech result storage.

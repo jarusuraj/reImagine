@@ -39,3 +39,4 @@ export function useTranslation() {
 
   return { result, translating, error, run, reset };
 }
+// Custom hook for handling manual translation logic and speech recognition state.

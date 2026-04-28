@@ -3,7 +3,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Root-level theme transition — buttery smooth day/night switch */
+
 html {
   transition: background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1),
               color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -39,7 +39,7 @@ html.dark {
   background-color: #111111;
 }
 
-/* Smooth transitions on ALL themed elements */
+
 header, main, footer, aside, div, button, input, textarea, p, span, h1, h2, h3 {
   transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
               border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
@@ -60,7 +60,7 @@ header, main, footer, aside, div, button, input, textarea, p, span, h1, h2, h3 {
 html.dark ::-webkit-scrollbar-thumb { background: #333; background-clip: content-box; }
 html.dark ::-webkit-scrollbar-thumb:hover { background: #444; background-clip: content-box; }
 
-/* Removed hiding scrollbars to ensure accessibility */
+
 textarea {
   scrollbar-width: thin;
   scrollbar-color: #cbd5e1 transparent;
@@ -87,7 +87,7 @@ html.dark .shimmer {
   background-size: 400px 100%;
 }
 
-/* ── Standardized Cursor Styling ── */
+
 button, 
 [role="button"],
 select,
@@ -109,3 +109,4 @@ button:disabled,
 [role="button"]:disabled {
   cursor: not-allowed;
 }
+/* Global styles for the popup, including themes, transitions, and animations. */

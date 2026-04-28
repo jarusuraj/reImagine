@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  // Reload huda purano UI hata
+  
   document.getElementById("tmt-overlay")?.remove();
   document.getElementById("tmt-page-prompt")?.remove();
   document.querySelector(".tmt-status-pill")?.remove();
@@ -20,7 +20,7 @@
   let isDraggingGlobal = false;
   const MIC_TIMEOUT_MS = 60_000;
 
-  // Security ko lagi policy bana
+  
   let ttPolicy: any;
   if (typeof (window as any).trustedTypes !== "undefined" && (window as any).trustedTypes.createPolicy) {
     try {
@@ -89,7 +89,7 @@
       handle.style.cursor = "grab";
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
-      // Briefly keep the flag true to prevent the global mouseup listener from firing a new overlay
+      
       setTimeout(() => { isDraggingGlobal = false; }, 50);
     };
     handle.addEventListener("mousedown", onMouseDown);
@@ -97,7 +97,7 @@
 
   function mountOverlay(x: number, y: number, text: string) {
     if (!document.body) return;
-    // Set manual translation flag to enable page prompts later
+    
     chrome.storage.local.set({ hasManuallyTranslated: true });
     
     removeOverlay();
@@ -132,7 +132,7 @@
   function showResult(translation: string, detectedLang?: string) {
     if (!overlay) return;
     const langLabel = detectedLang ?? "Auto";
-    // Security ko lagi HTML escape gara
+    
     overlay.innerHTML = `
       <div class="tmt-result">
         <div class="tmt-result-header">
@@ -222,13 +222,13 @@
       if (node.nodeType === Node.ELEMENT_NODE) {
         const el = node as Element;
         if (skipTags.has(el.tagName)) return;
-        // Edit garna milne thau xoda
+        
         if (el.getAttribute("contenteditable") !== null) return;
       }
 
       if (node.nodeType === Node.TEXT_NODE) {
         const val = node.nodeValue || "";
-        // Khali thau translate nagarne
+        
         if (val.trim().length > 1) nodes.push(node as Text);
         return;
       }
@@ -242,11 +242,11 @@
 
 
   function mountStatusPill() {
-    // Loading bar luka
+    
   }
 
   function updateStatusPill(_done: number, _total: number) {
-    // Progress update nagarne
+    
   }
 
   function completeStatusPill() {
@@ -318,7 +318,7 @@
             targetLang: pageTargetLang,
           }, (res) => {
             if (chrome.runtime.lastError) {
-              // Service worker restart bhako bhaye feri try garne
+              
               if (retries > 0 && pageActive) {
                 setTimeout(() => translateNode(node, retries - 1).then(resolve), 700);
               } else {
@@ -342,8 +342,8 @@
             resolve();
           });
         } catch (e) {
-          // Reload bhako vane stop garne
-          // The old script should just quietly die.
+          
+          
           pageActive = false;
           resolve();
         }
@@ -377,7 +377,7 @@
         return;
       }
 
-      // Service worker active rakhna
+      
       keepAlive = setInterval(() => {
         try {
           chrome.runtime.sendMessage({ action: "tmt_keepalive" }).catch(() => {});
@@ -386,7 +386,7 @@
         }
       }, 25_000) as unknown as number;
 
-      // Dekhine ra nadekhine thau xutyau
+      
       const viewportNodes: Text[] = [];
       const lazyNodes: Text[] = [];
 
@@ -399,7 +399,7 @@
         }
       }
 
-      // Dekhine thau paila translate garne
+      
       const BATCH_SIZE = 5;
       const BATCH_DELAY_MS = 150;
 
@@ -412,14 +412,14 @@
         }
       }
 
-      // Nadekhine thau scroll garda translate garne
+      
       if (lazyNodes.length === 0) {
         clearInterval(keepAlive);
         if (pageActive) completeStatusPill();
         return;
       }
 
-      // Parent anusar group banau
+      
       const parentMap = new Map<HTMLElement, Text[]>();
       for (const node of lazyNodes) {
         if (!node.parentElement) continue;
@@ -428,7 +428,7 @@
         parentMap.set(node.parentElement, existing);
       }
 
-      // Rate limit ko lagi buffer gara
+      
       let pendingElements: HTMLElement[] = [];
       let lazyTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -456,7 +456,7 @@
         });
         if (hasNew) {
           if (lazyTimer) clearTimeout(lazyTimer);
-          // Msg pathuna wait gara
+          
           lazyTimer = setTimeout(() => { flushPending(); }, 100);
         }
       }, { rootMargin: "300px 0px", threshold: 0.01 });
@@ -472,7 +472,7 @@
       if (keepAlive) clearInterval(keepAlive);
       if (observer) observer.disconnect();
       
-      // Error pill dekha
+      
       if (!statusPill) mountStatusPill();
       const statusText = document.querySelector('.tmt-status-text');
       if (statusText) statusText.textContent = `Translation stopped: ${err instanceof Error ? err.message : 'Unknown error'}`;
@@ -483,7 +483,7 @@
     pageActive = false;
     document.body.removeAttribute("data-tmt-active");
 
-    // Lazy observer clean gara
+    
     const obs = (document.body as any)._tmtObserver as IntersectionObserver | undefined;
     if (obs) {
       obs.disconnect();
@@ -497,7 +497,7 @@
       }
     });
 
-    // Feri translate garna milne gari reset gara
+    
     translatedNodes = new WeakSet<Text>();
   }
 
@@ -524,7 +524,7 @@
 
       const domainKey = `tmt_dismissed_${window.location.hostname}`;
       chrome.storage.local.get([domainKey, "hasManuallyTranslated"], (res) => {
-        // Only show prompt if user has manually translated something before
+        
         if (res.hasManuallyTranslated && !res[domainKey] && !sessionStorage.getItem("tmt_prompt_session_dismissed")) {
           showPagePrompt(detectedLangCode);
         }
@@ -551,7 +551,7 @@
 
     const prompt = document.createElement("div");
     prompt.id = "tmt-page-prompt";
-    // Prompt mount gara
+    
     prompt.innerHTML = safeHTML(`
       <div class="tmt-prompt-content">
         <div class="tmt-prompt-icon">
@@ -587,7 +587,7 @@
 
   document.addEventListener("mouseup", (e) => {
     if (!extensionEnabled || isDraggingGlobal) return;
-    // Don't show new overlay if one is already open until it is manually closed
+    
     if (document.getElementById("tmt-overlay")) return;
 
     const sel = window.getSelection()?.toString().trim();
@@ -604,17 +604,17 @@
 
   document.addEventListener("mousedown", () => {
     if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; }
-    // Overlay is no longer removed on mousedown to ensure only one persists until manually closed
+    
   });
 
   window.addEventListener("scroll", () => {
     if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; }
-    // Overlay persists during scroll as per manual closure requirement
+    
   }, { passive: true });
 
 
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-    // Afnai extension ko msg ho ki haina check gara
+    
     if (sender.id !== chrome.runtime.id) return;
 
     if (!extensionEnabled && msg.action !== "tmt_get_page_status") return;
@@ -696,3 +696,4 @@
     }
   });
 })();
+// Content script for page interactions, including overlays, page-wide translation, language detection, and speech recognition.

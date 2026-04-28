@@ -183,3 +183,4 @@ function HistoryCard({ entry, onDelete, onSelect }: { entry: HistoryEntry; onDel
     </div>
   );
 }
+// UI component for managing and viewing translation history.

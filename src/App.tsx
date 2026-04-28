@@ -74,14 +74,14 @@ export default function App() {
       const id = tab?.id;
       const url = tab?.url || "";
 
-      // HTTP/HTTPS site ma matra kaam gara
+      
       if (!id || !url.startsWith("http")) return;
 
       chrome.tabs.sendMessage(id, payload, (_res) => {
         const err = chrome.runtime.lastError?.message;
         if (!err || !err.includes("Receiving end does not exist")) return;
 
-        // Script xaina vane pathau
+        
         if (!chrome.scripting) return;
         chrome.scripting.executeScript(
           { target: { tabId: id }, files: ["content.js"] },
@@ -298,3 +298,4 @@ export default function App() {
     </div>
   );
 }
+// Main application component for the extension's popup, managing translation state, history, and page translation triggers.

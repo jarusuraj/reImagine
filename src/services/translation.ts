@@ -49,7 +49,7 @@ async function translateSingleSentence(
 ): Promise<string> {
   if (!text.trim()) return "";
 
-  const srcCode = LANG_CODE[sourceLang]; // "English" → "en", "Tamang" → "tmg"
+  const srcCode = LANG_CODE[sourceLang]; 
   const tgtCode = LANG_CODE[targetLang];
 
   if (srcCode === tgtCode) return text;
@@ -74,7 +74,7 @@ async function translateSingleSentence(
 
   const data = await response.json() as TMTResponse;
 
-  // TMT API check garna message_type hera
+  
   if (data.message_type === "FAIL") {
     throw new Error(data.message || "Translation failed");
   }
@@ -92,7 +92,7 @@ export async function translate(
   if (!sanitizedText) throw new Error("Please enter text to translate.");
   if (!TMT_URL || !TMT_KEY) throw new Error("TMT API is not configured. Check your credentials.");
 
-  // Auto vane paila language detect gara
+  
   const actualSourceLang: Language =
     sourceLang === "Auto" ? detectLanguage(sanitizedText) : sourceLang;
 
@@ -137,3 +137,4 @@ export async function translate(
     throw new Error("Oops! Something went wrong while translating. Please try again.");
   }
 }
+// Core translation service for language detection and API communication.

@@ -8,8 +8,9 @@ export const LANGUAGES: { value: Language; label: string; native: string; code: 
 ];
  
 export const LANG_CODE: Record<Language, string> = {
-  Auto:    "en",   // Auto is always resolved before reaching the API; "en" is a safe fallback
+  Auto:    "en",   
   English: "en",
   Nepali:  "ne",
   Tamang:  "tmg",
 };
+// Constants for supported languages and their ISO codes.

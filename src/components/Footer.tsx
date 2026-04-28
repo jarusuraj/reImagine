@@ -23,3 +23,4 @@ export function Footer() {
     </footer>
   );
 }
+// UI component for the popup footer, displaying branding.

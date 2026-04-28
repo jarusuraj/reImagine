@@ -16,3 +16,4 @@ export interface Settings {
   tmtApiUrl: string;
   tmtApiKey: string;
 }
+// TypeScript interfaces and types used throughout the application.

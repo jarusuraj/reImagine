@@ -1,4 +1,4 @@
-/// <reference types="vitest" />
+
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
@@ -18,7 +18,7 @@ export default defineConfig(({ mode }) => {
       "import.meta.env.TMT_API_URL":    JSON.stringify(env.TMT_API_URL    ?? ""),
       "import.meta.env.TMT_API_KEY":    JSON.stringify(env.TMT_API_KEY    ?? ""),
 
-      // Branding configuration pulled from .env
+      
       "import.meta.env.APP_TITLE":    JSON.stringify(env.APP_TITLE    ?? "reImagine"),
       "import.meta.env.APP_SUBTITLE": JSON.stringify(env.APP_SUBTITLE ?? "Translation Engine"),
       "import.meta.env.APP_FOOTER":   JSON.stringify(env.APP_FOOTER   ?? "reImagine · 2026"),
@@ -53,3 +53,4 @@ export default defineConfig(({ mode }) => {
     }
   };
 });
+// Configuration file for the Vite build tool and extension packaging.

@@ -20,7 +20,7 @@ export function useTheme() {
   const [theme, setThemeState] = useState<Theme>("light");
 
   useEffect(() => {
-    // Shuru ma load gara
+    
     if (chromeStorageAvailable()) {
       chrome.storage.local.get([THEME_KEY], (res) => {
         const saved = res[THEME_KEY] as Theme | undefined;
@@ -33,7 +33,7 @@ export function useTheme() {
   }, []);
 
   useEffect(() => {
-    // Theme change huda save ra apply gara
+    
     if (chromeStorageAvailable()) {
       chrome.storage.local.set({ [THEME_KEY]: theme });
     } else {
@@ -59,3 +59,4 @@ export function useTheme() {
 
   return { theme, setTheme, toggleTheme };
 }
+// Custom hook for managing light/dark mode themes.
