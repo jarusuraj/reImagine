@@ -40,8 +40,10 @@ export default function App() {
   useEffect(() => {
     if (typeof chrome === "undefined" || !chrome.storage) return;
 
-    chrome.storage.local.get(["extensionEnabled"], (res) => {
+    chrome.storage.local.get(["extensionEnabled", "sourceLang", "targetLang"], (res) => {
       if (res.extensionEnabled !== undefined) setEnabled(Boolean(res.extensionEnabled));
+      if (res.sourceLang !== undefined) setSourceLang(res.sourceLang as Language);
+      if (res.targetLang !== undefined) setTargetLang(res.targetLang as Language);
     });
 
     if (!chrome.tabs || !chrome.scripting) return;
@@ -131,6 +133,12 @@ export default function App() {
       chrome.storage.local.set({ extensionEnabled: next });
     }
   };
+
+  useEffect(() => {
+    if (typeof chrome !== "undefined" && chrome.storage) {
+      chrome.storage.local.set({ sourceLang, targetLang });
+    }
+  }, [sourceLang, targetLang]);
 
   return (
     <div className="h-[540px] w-[420px] bg-white dark:bg-[#000000] text-zinc-900 dark:text-zinc-100 flex flex-col relative overflow-hidden transition-colors duration-500">
