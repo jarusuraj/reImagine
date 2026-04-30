@@ -17,9 +17,6 @@ export function Footer() {
           </div>
         ))}
       </div>
-      <p className="text-[11px] font-medium text-zinc-500 dark:text-zinc-600 tracking-wide text-center">
-        &copy; 2026 reImagine. All Rights Reserved.
-      </p>
     </footer>
   );
 }
